@@ -22,7 +22,7 @@ const getRandomUserAgent = () => {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Define the URL outside the try block so it's accessible everywhere
-const SCRAPING_URL = 'https://www.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
+const SCRAPING_URL = 'https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -35,13 +35,15 @@ Deno.serve(async (req) => {
     
     const response = await axios.get(SCRAPING_URL, {
       headers: {
-        'User-Agent': getRandomUserAgent(),
-        'Accept': 'text/html',
-        'Referer': 'https://www.capitol.hawaii.gov'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Referer': 'https://data.capitol.hawaii.gov',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
       },
       timeout: 30000,
       maxRedirects: 5
     });
+
+    console.log('Status:', response.status);
 
     const $ = cheerio.load(response.data);
     const bills = [];
@@ -57,7 +59,7 @@ Deno.serve(async (req) => {
 
       if (billUrl) {
         bills.push({
-          bill_url: `https://www.capitol.hawaii.gov${billUrl}`,
+          bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
           bill_number: billNumber,
           description: measureStatus,
           current_status: currentStatus,
@@ -112,7 +114,7 @@ Deno.serve(async (req) => {
           
           if (billUrl) {
             bills.push({
-              bill_url: `https://www.capitol.hawaii.gov${billUrl}`,
+              bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
               bill_number: billNumber,
               description: measureStatus,
               current_status: currentStatus,
