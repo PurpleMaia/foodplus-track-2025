@@ -22,7 +22,7 @@ const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgent
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const SCRAPING_URL =
-  'https://www.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
+  'https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
 
 router.get('/', async (req, res) => {
   try {
@@ -32,7 +32,7 @@ router.get('/', async (req, res) => {
       headers: {
         'User-Agent': getRandomUserAgent(),
         Accept: 'text/html',
-        Referer: 'https://www.capitol.hawaii.gov',
+        Referer: 'https://data.capitol.hawaii.gov',
       },
       timeout: 30000,
       maxRedirects: 5,
@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
 
       if (billUrl) {
         bills.push({
-          bill_url: `https://www.capitol.hawaii.gov${billUrl}`,
+          bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
           bill_number: billNumber,
           description: measureStatus,
           current_status: currentStatus,
@@ -78,7 +78,7 @@ router.get('/', async (req, res) => {
             Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Cache-Control': 'no-cache',
-            Referer: 'https://www.capitol.hawaii.gov',
+            Referer: 'https://data.capitol.hawaii.gov',
           },
         });
 
@@ -96,7 +96,7 @@ router.get('/', async (req, res) => {
 
           if (billUrl) {
             bills.push({
-              bill_url: `https://www.capitol.hawaii.gov${billUrl}`,
+              bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
               bill_number: billNumber,
               description: measureStatus,
               current_status: currentStatus,

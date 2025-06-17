@@ -25,7 +25,7 @@ const Footer: React.FC = () => {
               <Github className="w-5 h-5" />
             </a>
             <a
-              href="https://www.capitol.hawaii.gov/"
+              href="https://data.capitol.hawaii.gov/"
               className="text-gray-300 hover:text-white transition-colors"
               target="_blank"
               rel="noopener noreferrer"

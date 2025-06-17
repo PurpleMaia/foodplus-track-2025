@@ -325,7 +325,7 @@ const BillsTable: React.FC = () => {
                             <ExternalLink className="w-4 h-4" />
                           </a>
                           <a
-                            href={`https://www.capitol.hawaii.gov/measure_indiv.aspx?billtype=HB&billnumber=${bill.bill_number?.replace('HB', '')}`}
+                            href={`https://data.capitol.hawaii.gov/measure_indiv.aspx?billtype=HB&billnumber=${bill.bill_number?.replace('HB', '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-blue-600 hover:text-blue-900 flex items-center"
