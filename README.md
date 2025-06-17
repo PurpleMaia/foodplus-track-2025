@@ -1,6 +1,6 @@
 # Hawaii Legislature Bill Scraper
 
-This project is a web dashboard and scraper for tracking bills from the Hawaii State Legislature. It is built with [React](https://react.dev/) and [Vite](https://vitejs.dev/) and uses [Supabase](https://supabase.com/) for storage and API functions.
+This project is a web dashboard and scraper for tracking bills from the Hawaii State Legislature. It is built with [React](https://react.dev/) and [Vite](https://vitejs.dev/) and uses [Supabase](https://supabase.com/) for storage and API functions. A small [Express](https://expressjs.com/) server powers the scraper endpoint and serves the production build.
 
 ## Prerequisites
 
@@ -23,7 +23,11 @@ This project is a web dashboard and scraper for tracking bills from the Hawaii S
    ```bash
    npm run build
    ```
-   You can preview the built app with:
+   After building you can start the Express server to serve the files:
+   ```bash
+   npm start
+   ```
+   You can also preview the built app directly with:
    ```bash
    npm run preview
    ```
@@ -40,12 +44,14 @@ This project is a web dashboard and scraper for tracking bills from the Hawaii S
 - `npm run preview` – preview the built app locally
 - `npm run lint` – run ESLint over the project
 - `npm run scrape` – run the scraper script (requires a `server/scraper.js` file)
+- `npm start` – start the Express server to serve the production build
 
 ## Directory Structure
 
 - `src/` – React application source code
 - `supabase/` – Supabase functions and migrations
 - `scripts/` – helper scripts
+- `server/` – Express server and scraping route
 
 ## Environment Variables
 
