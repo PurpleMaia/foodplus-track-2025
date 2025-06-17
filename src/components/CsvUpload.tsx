@@ -13,7 +13,6 @@ const CsvUpload: React.FC = () => {
   const [mappings, setMappings] = useState<Record<string, string>>({});
   const [previewData, setPreviewData] = useState<CsvRow[]>([]);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-  const [hasHeaders, setHasHeaders] = useState(false);
   const [rawData, setRawData] = useState<string[][]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 

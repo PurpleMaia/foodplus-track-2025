@@ -22,7 +22,7 @@ const getRandomUserAgent = () => {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Define the URL outside the try block so it's accessible everywhere
-const SCRAPING_URL = 'https://www.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
+const SCRAPING_URL = 'https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
       headers: {
         'User-Agent': getRandomUserAgent(),
         'Accept': 'text/html',
-        'Referer': 'https://www.capitol.hawaii.gov'
+        'Referer': 'https://data.capitol.hawaii.gov'
       },
       timeout: 30000,
       maxRedirects: 5
@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
 
       if (billUrl) {
         bills.push({
-          bill_url: `https://www.capitol.hawaii.gov${billUrl}`,
+          bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
           bill_number: billNumber,
           description: measureStatus,
           current_status: currentStatus,
@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9',
             'Cache-Control': 'no-cache',
-            'Referer': 'https://www.capitol.hawaii.gov'
+            'Referer': 'https://data.capitol.hawaii.gov'
           }
         });
         
@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
           
           if (billUrl) {
             bills.push({
-              bill_url: `https://www.capitol.hawaii.gov${billUrl}`,
+              bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
               bill_number: billNumber,
               description: measureStatus,
               current_status: currentStatus,
