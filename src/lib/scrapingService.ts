@@ -33,18 +33,13 @@ export const cancelScraping = async () => {
  */
 const scrapeBills = async () => {
   try {
-    console.log('Starting to scrape bills via Edge Function');
+    console.log('Starting to scrape bills via Express API endpoint');
     
-    const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-bills`,
+    const response = await fetch('/scrape-bills',
       {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        },
+        method: 'GET',        
       }
     );
-
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.details || 'Failed to scrape bills');
@@ -58,6 +53,7 @@ const scrapeBills = async () => {
     }
 
     console.log(`Scraped ${bills.length} bills`);
+    console.log(bills)
     return bills;
   } catch (error) {
     console.error('Error scraping bills:', error);
@@ -77,24 +73,27 @@ const saveBills = async (bills) => {
   
   console.log(`Saving ${bills.length} bills to database`);
   let successCount = 0;
+
   
   for (const bill of bills) {
     if (shouldCancelScraping) {
       console.log('Saving cancelled by user');
       break;
-    }
-    
+    }    
+    // https://qxmyadwlppkgagtdcepn.supabase.co/rest/v1/bills?select=id%2Cupdated_at&bill_url=eq.https%3A%2F%2Fwww.capitol.hawaii.gov%2Fsession%2Fmeasure_indiv.aspx%3Fbilltype%3DHB%26billnumber%3D2%26year%3D2025
     try {
       // Check if the bill already exists
       const { data: existingBill, error: selectError } = await supabase
         .from('bills')
         .select('id, updated_at')
-        .eq('bill_url', bill.bill_url)
-        .single();
+        .filter('bill_url', 'eq', bill.bill_url)
+        .limit(1);
+
+      console.log(existingBill)
 
       if (selectError) throw selectError;
       
-      if (existingBill) {
+      if (existingBill?.length > 0) {
         // Update existing bill if status has changed
         const { error: updateError } = await supabase
           .from('bills')
@@ -103,7 +102,7 @@ const saveBills = async (bills) => {
             current_status: bill.current_status,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', existingBill.id);
+          .eq('id', existingBill[0].id);
 
         if (updateError) throw updateError;
       } else {

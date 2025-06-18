@@ -43,6 +43,8 @@ Deno.serve(async (req) => {
       maxRedirects: 5
     });
 
+    console.log('Status:', response.status);
+
     const $ = cheerio.load(response.data);
     const bills = [];
 

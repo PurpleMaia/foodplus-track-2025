@@ -1,3 +1,4 @@
+// get data from the supabase and call service api
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
 import { startScraping, cancelScraping } from '../lib/scrapingService';

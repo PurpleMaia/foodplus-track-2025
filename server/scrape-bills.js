@@ -22,12 +22,12 @@ const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgent
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const SCRAPING_URL =
-  'https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
+'https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
 
 router.get('/', async (req, res) => {
   try {
     await delay(1000);
-
+    
     const response = await axios.get(SCRAPING_URL, {
       headers: {
         'User-Agent': getRandomUserAgent(),
@@ -37,33 +37,43 @@ router.get('/', async (req, res) => {
       timeout: 30000,
       maxRedirects: 5,
     });
-
+    
     const $ = cheerio.load(response.data);
     const bills = [];
-
-    $('table tr').each((i, element) => {
+    
+    $('table tr').slice(1, 26).each((i, element) => {
       if (i === 0) return; // skip header row
-
-      const billLink = $(element).find('td:nth-child(1) a');
+      
+      // <a>
+      const billLink = $(element).find('a.report');
       const billUrl = billLink.attr('href');
       const billNumber = billLink.text().trim();
-      const measureStatus = $(element).find('td:nth-child(2)').text().trim();
-      const currentStatus = $(element).find('td:nth-child(3)').text().trim();
+      
+      // measureStatus stuff
+      const measureStatus = $(element).find('td:nth-child(2) span');
+      // const reportTitle = measureStatus.eq(0).text().trim();
+      const measureTitle = measureStatus.eq(2).text().trim();
+      const description = measureStatus.eq(3).text().trim();
 
+      const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
+      const introducers = $(element).find('td:nth-child(4)').text().trim();
+      const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
+      // const companion = $(element).find('td:nth-child(6)').text().trim();
+      
       if (billUrl) {
         bills.push({
-          bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
-          bill_number: billNumber,
-          description: measureStatus,
+          bill_url: billUrl,
+          description: description,
           current_status: currentStatus,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          committee_assignment: committeeAssignment,
+          bill_title: measureTitle,
+          introducer: introducers,
+          bill_number: billNumber,
         });
-      }
-
-      return i < 25;
+      }      
     });
-
     res.set(corsHeaders).json({ bills });
   } catch (error) {
     console.error('Error scraping bills:', error);
