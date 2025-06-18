@@ -41,7 +41,7 @@ router.get('/', async (req, res) => {
     const $ = cheerio.load(response.data);
     const bills = [];
     
-    $('table tr').slice(1, 3).each((i, element) => {
+    $('table tr').slice(1, 26).each((i, element) => {
       if (i === 0) return; // skip header row
       
       // <a>

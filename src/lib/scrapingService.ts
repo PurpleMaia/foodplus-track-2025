@@ -102,7 +102,7 @@ const saveBills = async (bills) => {
             current_status: bill.current_status,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', existingBill.id);
+          .eq('id', existingBill[0].id);
 
         if (updateError) throw updateError;
       } else {
