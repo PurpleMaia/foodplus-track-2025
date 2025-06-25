@@ -55,6 +55,12 @@ router.get('/', async (req, res) => {
       const measureTitle = measureStatus.eq(2).text().trim();
       const description = measureStatus.eq(3).text().trim();
 
+      const companion = null;
+      const currentReferral = null;
+      
+
+
+
       const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
       const introducers = $(element).find('td:nth-child(4)').text().trim();
       const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
