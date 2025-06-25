@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { db } from '../../db/kysely/client'
 
 // Flag to track if scraping should be cancelled
 let shouldCancelScraping = false;
@@ -16,7 +16,8 @@ export const startScraping = async () => {
     return bills;
   } catch (error) {
     console.error('Error during scraping:', error);
-    await updateScrapingStats(0, false, error.message);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    await updateScrapingStats(0, false, errorMessage);
     throw error;
   }
 };
@@ -61,11 +62,23 @@ const scrapeBills = async () => {
   }
 };
 
+interface BillData {
+  bill_url: string;
+  bill_number?: string;
+  bill_title?: string;
+  description: string;
+  current_status: string;
+  committee_assignment?: string;
+  introducer?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 /**
  * Save bills to the database
  * @returns {Promise<number>} The number of successfully saved bills
  */
-const saveBills = async (bills) => {
+const saveBills = async (bills: BillData[]) => {
   if (bills.length === 0) {
     console.log('No bills to save');
     return 0;
@@ -83,35 +96,42 @@ const saveBills = async (bills) => {
     // https://qxmyadwlppkgagtdcepn.supabase.co/rest/v1/bills?select=id%2Cupdated_at&bill_url=eq.https%3A%2F%2Fwww.capitol.hawaii.gov%2Fsession%2Fmeasure_indiv.aspx%3Fbilltype%3DHB%26billnumber%3D2%26year%3D2025
     try {
       // Check if the bill already exists
-      const { data: existingBill, error: selectError } = await supabase
-        .from('bills')
-        .select('id, updated_at')
-        .filter('bill_url', 'eq', bill.bill_url)
-        .limit(1);
+      const existingBill = await db
+        .selectFrom('bills')
+        .select(['id', 'updated_at'])
+        .where('bill_url', '=', bill.bill_url)
+        .limit(1)
+        .executeTakeFirst();
 
       console.log(existingBill)
 
-      if (selectError) throw selectError;
-      
-      if (existingBill?.length > 0) {
+      if (existingBill) {
         // Update existing bill if status has changed
-        const { error: updateError } = await supabase
-          .from('bills')
-          .update({
-            measure_status: bill.measure_status,
+        await db
+          .updateTable('bills')
+          .set({
+            description: bill.description,
             current_status: bill.current_status,
-            updated_at: new Date().toISOString(),
+            updated_at: new Date(),
           })
-          .eq('id', existingBill[0].id);
-
-        if (updateError) throw updateError;
+          .where('id', '=', existingBill.id)
+          .execute();
       } else {
         // Insert new bill
-        const { error: insertError } = await supabase
-          .from('bills')
-          .insert([bill]);
-
-        if (insertError) throw insertError;
+        await db
+          .insertInto('bills')
+          .values({
+            bill_url: bill.bill_url,
+            bill_number: bill.bill_number || null,
+            bill_title: bill.bill_title || null,
+            description: bill.description,
+            current_status: bill.current_status,
+            committee_assignment: bill.committee_assignment || null,
+            introducer: bill.introducer || null,
+            created_at: new Date(),
+            updated_at: new Date(),
+          })
+          .execute();
       }
       
       successCount++;
@@ -130,13 +150,15 @@ const saveBills = async (bills) => {
  */
 const updateScrapingStats = async (billsSaved: number, success: boolean, errorMessage?: string) => {
   try {
-    const { error } = await supabase.rpc('insert_scraping_stats', {
-      p_bills_scraped: billsSaved,
-      p_success: success,
-      p_error_message: errorMessage || null
-    });
-
-    if (error) throw error;
+    await db
+      .insertInto('scraping_stats')
+      .values({
+        bills_scraped: billsSaved,
+        success: success,
+        error_message: errorMessage || null,
+        last_scrape_time: new Date(),
+      })
+      .execute();
     
     console.log('Scraping stats updated');
   } catch (error) {
