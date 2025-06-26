@@ -13,6 +13,7 @@ const URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype
       timeout: 30000
     });
 
+
     const data = response.data;
     console.log('✅ Data retrieved:', data.slice(0, 3)); // Preview first 3 items
 
