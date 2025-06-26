@@ -10,13 +10,14 @@
     "preview": "vite preview",
     "scrape": "node server/scraper.js",
     "start": "node server/index.js",
-    "kysely-codegen": "kysely-codegen --url \"$DATABASE_URL\" --out-file db/generated.ts"
+    "kysely-codegen": "kysely-codegen --dialect postgres --env-file ./.env --out-file db/generated.d.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",
     "axios": "^1.10.0",
     "cheerio": "^1.0.0-rc.12",
     "date-fns": "^3.3.1",
+    "dotenv": "^16.5.0",
     "express": "^4.19.2",
     "kysely": "^0.28.2",
     "lucide-react": "^0.344.0",
@@ -30,6 +31,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.1",
+    "@types/express": "^5.0.3",
     "@types/papaparse": "^5.3.14",
     "@types/pg": "^8.15.4",
     "@types/react": "^18.3.5",

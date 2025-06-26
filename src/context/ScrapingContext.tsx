@@ -1,7 +1,7 @@
 // get data from the supabase and call service api
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabaseClient';
-import { startScraping, cancelScraping } from '../lib/scrapingService';
+import { startScraping, cancelScraping } from '../lib/scrapingClient';
 import toast from 'react-hot-toast';
 import { Bill, ScrapingStatus } from '../types';
 
