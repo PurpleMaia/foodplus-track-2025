@@ -59,7 +59,7 @@ export async function scrapeBills() {
     $('table tr').slice(1, 26).each((i, element) => {
       if (i === 0) return;
       const billLink = $(element).find('a.report');
-      const billUrl = billLink.attr('href');
+      const billUrl = billLink.attr('href'); //www.capitol. replace it data. using regex
       const billNumber = billLink.text().trim();
       const measureStatus = $(element).find('td:nth-child(2) span');
       const measureTitle = measureStatus.eq(2).text().trim();
@@ -204,4 +204,82 @@ export async function updateScrapingStats(billsSaved, success, errorMessage) {
     console.error('Error updating scraping stats:', error);
     throw error;
   }
+}
+
+// Scrape individual bill 
+const INDIVIDUAL_URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype=SB&billnumber=1186&year=2025'; // example endpoint: bills dataset
+
+export async function scrapeIndividual() {
+  try {
+    // ==== test-scrape.js ====
+     console.log('Starting to test scrape the individual page')
+     await delay(1000)
+
+    const response = await axios.get(INDIVIDUAL_URL, {
+      headers: {
+        'User-Agent': getRandomUserAgent(),
+        Accept: 'text/html',
+        Referer: 'https://data.capitol.hawaii.gov',
+      },
+      timeout: 30000,
+      maxRedirects: 5,
+    });
+    // =========================
+    
+    const $ = cheerio.load(response.data)
+
+    // $('span').each((i, el) => {
+    // const id = $(el).attr('id');
+    // const text = $(el).text().trim();
+    //   if (id) {
+    //     console.log(`${id} => ${text}`);
+    //   }
+    // });
+
+    // 5. Extract introducers
+    const introducers = $('#ctl00_MainContent_ListView1_ctrl0_introducerLabel').text().trim();
+    const billTitle = $('#ctl00_MainContent_ListView1_ctrl0_titleLabel').text().trim();
+    const currentReferral = $('#ctl00_MainContent_ListView1_ctrl0_current_referralLabel').text().trim();
+    const currentStatus = $('#ctl00_MainContent_ListView1_ctrl0_statusLabel').text().trim();
+    const description = $('#ctl00_MainContent_ListView1_ctrl0_descriptionLabel').text().trim();
+    const measureType = $('#ctl00_MainContent_ListView1_ctrl0_measuretypeLabel').text().trim();
+    // const statuses = $('#ctl00_MainContent_UpdatePanel1').text().trim();
+
+    const statuses = []
+    $('#ctl00_MainContent_GridViewStatus tr').each((i, row) => {
+      console.log('Number of status rows:', $('#ctl00_MainContent_GridViewStatus tr').length);
+
+      const tds = $(row).find('td');
+      if (tds.length === 3) {
+        const date = $(tds[0]).text().trim();
+        const statusText = $(tds[2]).text().trim();
+
+        console.log(`✅ ${date} — ${statusText}`)
+        statuses.push({
+          date: date,
+          statusText: statusText
+        });
+        // if (statusText.toLowerCase().includes('introduc')) {
+        //   console.log(`✅ ${date} — ${statusText}`);
+        // }
+      }
+    });
+
+    const billData = {
+      introducers: introducers,
+      billTitle: billTitle,
+      currentReferral: currentReferral,
+      currentStatus: currentStatus,
+      description: description,
+      measureType: measureType,
+      statuses: statuses
+    };
+    
+    return billData;
+    
+  } catch (error) {
+    console.error('Error scraping bills:', error);
+  }
+
+
 }

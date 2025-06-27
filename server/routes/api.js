@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import { startScraping, saveBills, updateScrapingStats } from '../services/scrapingService.js';
-
+import { startScraping, saveBills, updateScrapingStats, scrapeIndividual } from '../services/scrapingService.js';
 const router = Router();
 
 // GET /api/scrape-bills - Start scraping process
@@ -45,7 +44,7 @@ router.post('/update-scraping-stats', async (req, res) => {
     if (typeof billsSaved !== 'number' || typeof success !== 'boolean') {
       return res.status(400).json({ error: 'Invalid stats data' });
     }
-    
+
     await updateScrapingStats(billsSaved, success, errorMessage);
     res.json({ success: true });
   } catch (error) {
@@ -57,4 +56,13 @@ router.post('/update-scraping-stats', async (req, res) => {
   }
 });
 
-export default router; 
+// GET /api/scrape-individual
+router.get('/scrape-individual', async (req, res) =>{
+  try{
+    const individualBill = await scrapeIndividual()
+    res.json({ individualBill });
+  }catch(error){
+    console.log('Error in scrape-individual endpoint:', error);
+  }
+})
+export default router;

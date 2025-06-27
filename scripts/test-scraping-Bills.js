@@ -4,16 +4,16 @@ import { readFileSync } from 'fs';
 import * as cheerio from 'cheerio';
 
 // 1. Read the JSON file
-const raw = readFileSync('./hawaii-data-test.json', 'utf-8');
+const raw = readFileSync('./hawaii-data-test.html');
 
-// 2. Parse JSON (if it's stored as a stringified object with HTML content)
-const parsed = JSON.parse(raw);
+// // 2. Parse JSON (if it's stored as a stringified object with HTML content)
+// const parsed = JSON.parse(raw);
 
-// 3. Get the HTML content — adjust key if needed
-const rawHtml = parsed.html || parsed; // fallback if file is just a raw string
+// // 3. Get the HTML content — adjust key if needed
+// const rawHtml = parsed.html || parsed; // fallback if file is just a raw string
 
 // 4. Load HTML into Cheerio
-const $ = cheerio.load(rawHtml);
+const $ = cheerio.load(raw);
 
 $('span').each((i, el) => {
     const id = $(el).attr('id');
@@ -51,9 +51,9 @@ $('#ctl00_MainContent_GridViewStatus tr').each((i, row) => {
   if (tds.length === 3) {
     const date = $(tds[0]).text().trim();
     const statusText = $(tds[2]).text().trim();
-
-    if (statusText.toLowerCase().includes('introduc')) {
-      console.log(`✅ ${date} — ${statusText}`);
-    }
+    console.log(`✅ ${date} — ${statusText}`)
+    // if (statusText.toLowerCase().includes('introduc')) {
+    //   console.log(`✅ ${date} — ${statusText}`);
+    // }
   }
 });

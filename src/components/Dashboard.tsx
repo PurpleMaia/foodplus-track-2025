@@ -9,9 +9,11 @@ const Dashboard: React.FC = () => {
     totalBills, 
     lastScraped, 
     isLoading, 
-    scrapingStatus, 
+    scrapingStatus,
     refreshBills, 
-    startScrapingJob 
+    startScrapingJob,
+    startScrapingIndividualJob, 
+    individualBillContents
   } = useScrapingContext();
 
   return (
@@ -33,6 +35,13 @@ const Dashboard: React.FC = () => {
             className="flex items-center px-3 py-2 bg-amber-500 text-white rounded-md hover:bg-amber-600 transition-colors disabled:bg-amber-300"
           >
             Start Scraping
+          </button>
+          <button
+          onClick={startScrapingIndividualJob}
+          disabled={scrapingStatus === 'scraping' || isLoading}
+          className="flex items-center px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors disabled:bg-amber-300"
+          >
+            test
           </button>
         </div>
       </div>
@@ -74,6 +83,17 @@ const Dashboard: React.FC = () => {
           description="No current issues detected"
           color="bg-red-50 border-red-200"
         />
+        <StatCard 
+          title="Individual Bill Scrape"
+          value={individualBillContents} 
+          icon={<FileText className="w-8 h-8 text-green-500" />}
+          description="Last time data was scraped"
+          color="bg-green-50 border-green-200"
+        />
+
+
+
+
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">

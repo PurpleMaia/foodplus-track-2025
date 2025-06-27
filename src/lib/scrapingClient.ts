@@ -22,6 +22,27 @@ export const startScraping = async () => {
   }
 };
 
+export const scrapeIndividual = async () => {
+  try {
+    const response = await fetch('/api/scrape-individual', {
+      method: 'GET',
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.details || 'Failed to scrape individual bill');
+    }
+    const bill = await response.text();
+    
+    console.log('data from client call:', bill)
+
+    return bill;
+  } catch (error) {
+    console.error('Error during scraping:', error);
+    throw error;
+  }
+};
+
+
 /**
  * Cancel the scraping process (no-op on frontend, but kept for API compatibility)
  */
@@ -29,3 +50,4 @@ export const cancelScraping = async () => {
   // Optionally, you could call a backend endpoint to cancel a running job
   // For now, this is a no-op on the frontend
 };
+
