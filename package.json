@@ -21,6 +21,7 @@
     "express": "^4.19.2",
     "kysely": "^0.28.2",
     "lucide-react": "^0.344.0",
+    "openai": "^5.8.1",
     "papaparse": "^5.4.1",
     "pg": "^8.16.2",
     "playwright": "^1.53.0",
