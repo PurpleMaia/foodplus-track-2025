@@ -249,8 +249,15 @@ export async function scrapeIndividual() {
     
     // const statuses = $('#ctl00_MainContent_UpdatePanel1').text().trim();
 
-    
+    // get billID for foreign key insertion constraints
+    const billID = await db
+      .selectFrom('bills')
+      .select('id')
+      .where('bill_number', '=', billTitle)
+      .executeTakeFirst();
 
+    console.log('bill_id:', billID.id)
+    
     const statuses = []
     $('#MainContent_GridViewStatus tr').each((i, row) => {
       // console.log('Number of status rows:', $('#MainContent_GridViewStatus tr').length);
@@ -261,15 +268,13 @@ export async function scrapeIndividual() {
         const chamber = $(tds[1]).text().trim();
         const statusText = $(tds[2]).text().trim();
 
-        // console.log(`✅ ${date} — ${statusText}`)
+        // building row in status_updates
         statuses.push({
-          date: date,
+          bill_id: billID.id, // FK
           chamber: chamber,
-          statusText: statusText
-        });
-        // if (statusText.toLowerCase().includes('introduc')) {
-        //   console.log(`✅ ${date} — ${statusText}`);
-        // }
+          date: date,
+          statustext: statusText
+        });    
       }
     });
 
@@ -282,13 +287,16 @@ export async function scrapeIndividual() {
       measureType: measureType,
       statuses: statuses
     };
-    
+
+    await db
+      .insertInto('status_updates')
+      .values(statuses)
+      .execute();
 
     return billData;
-    
+
   } catch (error) {
     console.error('Error scraping bills:', error);
   }
-
 
 }
