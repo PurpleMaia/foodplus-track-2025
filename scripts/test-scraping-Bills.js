@@ -4,7 +4,7 @@ import { readFileSync } from 'fs';
 import * as cheerio from 'cheerio';
 
 // 1. Read the JSON file
-const raw = readFileSync('./hawaii-data-test.html');
+const raw = readFileSync('./scripts/hawaii-data-test.html');
 
 // // 2. Parse JSON (if it's stored as a stringified object with HTML content)
 // const parsed = JSON.parse(raw);
@@ -15,13 +15,13 @@ const raw = readFileSync('./hawaii-data-test.html');
 // 4. Load HTML into Cheerio
 const $ = cheerio.load(raw);
 
-$('span').each((i, el) => {
-    const id = $(el).attr('id');
-    const text = $(el).text().trim();
-    if (id) {
-      console.log(`🆔 ${id} => ${text}`);
-    }
-  });
+// $('span').each((i, el) => {
+//     const id = $(el).attr('id');
+//     const text = $(el).text().trim();
+//     if (id) {
+//       console.log(`🆔 ${id} => ${text}`);
+//     }
+//   });
 
 // 5. Extract introducers
 const introducers = $('#ctl00_MainContent_ListView1_ctrl0_introducerLabel').text().trim();

@@ -1,6 +1,7 @@
 import { db } from '../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { writeFileSync } from 'fs';
 
 // Flag to track if scraping should be cancelled
 let shouldCancelScraping = false;
@@ -224,9 +225,12 @@ export async function scrapeIndividual() {
       timeout: 30000,
       maxRedirects: 5,
     });
-    // =========================
-    
+    // =========================    
+  
     const $ = cheerio.load(response.data)
+
+
+    
 
     // $('span').each((i, el) => {
     // const id = $(el).attr('id');
@@ -237,26 +241,30 @@ export async function scrapeIndividual() {
     // });
 
     // 5. Extract introducers
-    const introducers = $('#ctl00_MainContent_ListView1_ctrl0_introducerLabel').text().trim();
-    const billTitle = $('#ctl00_MainContent_ListView1_ctrl0_titleLabel').text().trim();
-    const currentReferral = $('#ctl00_MainContent_ListView1_ctrl0_current_referralLabel').text().trim();
-    const currentStatus = $('#ctl00_MainContent_ListView1_ctrl0_statusLabel').text().trim();
-    const description = $('#ctl00_MainContent_ListView1_ctrl0_descriptionLabel').text().trim();
-    const measureType = $('#ctl00_MainContent_ListView1_ctrl0_measuretypeLabel').text().trim();
+    const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
+    const billTitle = $('#MainContent_LinkButtonMeasure').text().trim();
+    const currentReferral = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
+    const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
+    const measureType = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
+    
     // const statuses = $('#ctl00_MainContent_UpdatePanel1').text().trim();
 
+    
+
     const statuses = []
-    $('#ctl00_MainContent_GridViewStatus tr').each((i, row) => {
-      console.log('Number of status rows:', $('#ctl00_MainContent_GridViewStatus tr').length);
+    $('#MainContent_GridViewStatus tr').each((i, row) => {
+      // console.log('Number of status rows:', $('#MainContent_GridViewStatus tr').length);
 
       const tds = $(row).find('td');
       if (tds.length === 3) {
         const date = $(tds[0]).text().trim();
+        const chamber = $(tds[1]).text().trim();
         const statusText = $(tds[2]).text().trim();
 
-        console.log(`✅ ${date} — ${statusText}`)
+        // console.log(`✅ ${date} — ${statusText}`)
         statuses.push({
           date: date,
+          chamber: chamber,
           statusText: statusText
         });
         // if (statusText.toLowerCase().includes('introduc')) {
@@ -269,12 +277,13 @@ export async function scrapeIndividual() {
       introducers: introducers,
       billTitle: billTitle,
       currentReferral: currentReferral,
-      currentStatus: currentStatus,
+      // currentStatus: currentStatus,
       description: description,
       measureType: measureType,
       statuses: statuses
     };
     
+
     return billData;
     
   } catch (error) {
