@@ -25,8 +25,17 @@ export async function startScraping() {
   shouldCancelScraping = false;
   try {
     const bills = await scrapeBills();
+    for (const bill of bills) {
+      console.log("ABOUT TO TEST THE SCRAPE INDIV");
+      console.log("bill.bill_url:", bill.bill_url);
+      const updatedUrl = bill.bill_url.replace("www.", "data.");
+      await scrapeIndividual(updatedUrl);
+    }
     const savedBillsCount = await saveBills(bills);
     await updateScrapingStats(savedBillsCount, true);
+
+    // await scrapeIndividual(bills.bill_url);
+    // console.log(`bill.bill_url: ${bills.bill_url}`);
     return bills;
   } catch (error) {
     console.error('Error during scraping:', error);
@@ -208,9 +217,12 @@ export async function updateScrapingStats(billsSaved, success, errorMessage) {
 }
 
 // Scrape individual bill 
-const INDIVIDUAL_URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype=SB&billnumber=1186&year=2025'; // example endpoint: bills dataset
+// const INDIVIDUAL_URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype=SB&billnumber=1186&year=2025'; // example endpoint: bills dataset
 
-export async function scrapeIndividual() {
+console.log("GOING IN");
+
+export async function scrapeIndividual(INDIVIDUAL_URL) {
+  console.log("individual Url: ", INDIVIDUAL_URL);
   try {
     // ==== test-scrape.js ====
      console.log('Starting to test scrape the individual page')
@@ -226,19 +238,11 @@ export async function scrapeIndividual() {
       maxRedirects: 5,
     });
     // =========================    
-  
+
     const $ = cheerio.load(response.data)
 
 
-    
 
-    // $('span').each((i, el) => {
-    // const id = $(el).attr('id');
-    // const text = $(el).text().trim();
-    //   if (id) {
-    //     console.log(`${id} => ${text}`);
-    //   }
-    // });
 
     // 5. Extract introducers
     const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
@@ -287,6 +291,8 @@ export async function scrapeIndividual() {
       measureType: measureType,
       statuses: statuses
     };
+
+    console.log(billData);
 
     await db
       .insertInto('status_updates')
