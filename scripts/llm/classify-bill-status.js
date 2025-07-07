@@ -12,9 +12,9 @@ function getArg(flag, defaultValue) {
     return defaultValue;
 }
 
-const PROMPT_CHOICE = getArg('prompt', '1'); // SYSTEM PROMPT '1' or '2' (with passed), (without)
+const PROMPT_CHOICE = getArg('prompt', '1'); // SYSTEM PROMPT '1' or '2' (with passed), (without), enhanced sysprompt
 const BATCH_SIZE = 5;
-const BATCH_DELAY = 2000;
+const BATCH_DELAY = 5000;
 
 const client = new OpenAI({
     apiKey: process.env.OPENAI_KEY,
@@ -85,92 +85,85 @@ Only output exactly one of those labels, with no extra text.
 `.trim();
 
 const SYSTEM_PROMPT3 = `
-You are a bill-status classifier. You must choose exactly one of these labels—nothing else. Here are the labels and what they mean:
+You are a legislative-status classifier with advanced reasoning capabilities. Your task is:
 
-• Introduced/Waiting to be Scheduled for First Committee Hearing  
-   – The bill has just been introduced in the originating chamber and no committee hearing is yet scheduled.
+- Determine the current phase of the bill (House, Senate/crossover, Conference, or Governor) by reviewing the entire provided context chronologically.
 
-• Scheduled for First Committee Hearing  
-   – A date has been set for the bill’s first committee hearing in the current chamber.
+- Prune the full set of labels to only those relevant to the identified phase.
 
-• Deferred after First Committee Hearing  
-   – A first committee hearing was scheduled but no favorable report or passage followed, indicating deferral.
+- Select exactly one label from that subset by matching the current status line against the detailed descriptions below.
 
-• Waiting to be Scheduled for Second Committee Hearing  
-   – The bill passed or was reported from the first committee, and the second committee hearing has not yet been scheduled.
+Output Requirement:
 
-• Scheduled for Second Committee Hearing  
-   – A date has been set for the second committee hearing.
+- Do NOT reveal your reasoning or chain-of-thought.
 
-• Deferred after Second Committee Hearing  
-   – The second committee hearing was scheduled but no report or passage followed, indicating deferral.
+- Output exactly and only the chosen label—nothing else.
 
-• Waiting to be Scheduled for Third Committee Hearing  
-   – The bill passed the second committee, and the third committee hearing has not yet been scheduled.
+Label Descriptions:
 
-• Scheduled for Third Committee Hearing  
-   – A date has been set for the third committee hearing.
+House Zone Labels:
 
-• Deferred after Third Committee Hearing  
-   – The third committee hearing was scheduled but no report or passage followed, indicating deferral.
+Introduced/Waiting to be Scheduled for First Committee Hearing: The bill has been formally introduced in the House and no first committee hearing has yet been scheduled.
 
-• Crossover/Waiting to be Scheduled for First Committee Hearing  
-    – The bill has passed the originating chamber and been transmitted to the other chamber, and no committee hearing is yet scheduled there.
+Scheduled for First Committee Hearing: A date, time, or notice for the bill’s first committee hearing in the House has been set.
 
-• Scheduled for First Committee Hearing after Crossover  
-    – A date has been set for the bill’s first committee hearing in the new chamber after crossover.
+Deferred after First Committee Hearing: The first committee hearing occurred but the committee did not report the bill; it has been deferred or continued.
 
-• Deferred after First Committee Hearing after Crossover  
-    – That first hearing in the new chamber was scheduled but no report or passage followed, indicating deferral.
+Waiting to be Scheduled for Second Committee Hearing: The bill passed (or was reported out of) its first committee and is awaiting scheduling of its second committee hearing.
 
-• Waiting to be Scheduled for Second Committee Hearing after Crossover  
-    – The bill passed or was reported from its first committee after crossover, and the second hearing has not yet been scheduled.
+Scheduled for Second Committee Hearing: A date, time, or notice for the second committee hearing in the House has been set.
 
-• Scheduled for Second Committee Hearing after Crossover  
-    – A date has been set for the second committee hearing in the new chamber after crossover.
+Deferred after Second Committee Hearing: The second committee hearing took place but the bill was not advanced; it has been deferred.
 
-• Deferred after Second Committee Hearing after Crossover  
-    – The second hearing after crossover was scheduled but no report/passage followed, indicating deferral.
+Waiting to be Scheduled for Third Committee Hearing: The bill passed its second committee and is awaiting its third committee hearing in the House.
 
-• Waiting to be Scheduled for Third Committee Hearing after Crossover  
-    – The bill passed the second committee after crossover, and the third hearing has not yet been scheduled.
+Scheduled for Third Committee Hearing: A date, time, or notice for the third committee hearing in the House has been set.
 
-• Scheduled for Third Committee Hearing after Crossover  
-    – A date has been set for the third committee hearing after crossover.
+Deferred after Third Committee Hearing: The third committee hearing occurred but the bill did not move forward; it has been deferred.
 
-• Deferred after Third Committee Hearing after Crossover  
-    – The third hearing after crossover was scheduled but no report/passage followed, indicating deferral.
+Senate/Crossover Zone Labels:
 
-• Passed House and Senate Committees!  
-    – After crossover, the bill has successfully passed the final reading, NOT the conference committee.
+Crossover/Waiting to be Scheduled for First Committee Hearing: The bill was transmitted from the House to the Senate (crossover) and no first Senate committee hearing is yet scheduled.
 
-• Assigned Conference Committees  
-    – Conferees have been appointed and a conference committee has been convened.
+Scheduled for First Committee Hearing after Crossover: A date, time, or notice has been set for the bill’s first committee hearing in the Senate.
 
-• Scheduled for Conference Hearing  
-    – A date has been set for the conference committee hearing.
+Deferred after First Committee Hearing after Crossover: The first Senate committee hearing occurred but the bill was deferred.
 
-• Deferred during Conference Committee  
-    – A conference hearing was scheduled but no conference report followed, indicating deferral.
+Waiting to be Scheduled for Second Committee Hearing after Crossover: The bill passed its first Senate committee and is awaiting its second Senate committee hearing schedule.
 
-• Passed Conference Committee  
-    – The Conference Committee has issued a report recommending the measure be passed.
+Scheduled for Second Committee Hearing after Crossover: A date, time, or notice for the second Senate committee hearing has been set.
 
-• Transmitted to Governor  
-    – The enrolled bill has been sent to the Governor for consideration.
+Deferred after Second Committee Hearing after Crossover: The second Senate committee hearing occurred but the bill was deferred.
 
-• Governor’s intent to Veto List  
-    – The Governor has formally indicated intent to veto the bill.
+Waiting to be Scheduled for Third Committee Hearing after Crossover: The bill passed its second Senate committee and is awaiting its third Senate committee hearing schedule.
 
-• Governor Signs Bill Into Law  
-    – The Governor has signed the bill into law.
+Scheduled for Third Committee Hearing after Crossover: A date, time, or notice for the third Senate committee hearing has been set.
 
-• Became law without Gov signature  
-    – The bill became law without the Governor’s signature (e.g., by default).
+Deferred after Third Committee Hearing after Crossover: The third Senate committee hearing occurred but the bill was deferred.
 
-Always review the status entries in strict chronological order and base your label solely on the *last* relevant status action. Do NOT consider earlier steps once a later phase (e.g. crossover or conference) has begun.  
+Common Committee Completion Label:
 
-ONLY respond with exactly one of the 27 labels above, with no additional text.  
+Passed all Committees!: The bill has passed the final (third) reading or stage in both chambers’ committees.
+
+Conference Zone Labels:
+
+Assigned Conference Committees: A disagreement was noted and conferees (from both chambers) were appointed.
+
+Scheduled for Conference Hearing: A date, time, or notice has been set for the conference committee to meet.
+
+Deferred during Conference Committee: The conference committee convened but deferred the bill without agreement.
+
+Passed Conference Committee: The conference committee met and agreed on an amended version of the bill.
+
+Governor Zone Labels:
+
+Transmitted to Governor: The enrolled measure has been sent to the Governor’s desk.
+
+Governor's intent to Veto List: The Governor has indicated an intent to veto the bill.
+
+Governor Signs Bill Into Law: The Governor has signed the enrolled bill, making it law.
+
+Became law without Gov signature: The bill became law by constitutional default without the Governor’s signature.
 `.trim();
 
 const SYSTEM_PROMPT =
@@ -181,7 +174,7 @@ const SYSTEM_PROMPT =
 async function classifyStatus(statusLog, maxRetries = 3, retryDelay = 1000) {
     const currStatus = statusLog.split(/\r?\n/)[0];
     let attempt = 0;
-    // const context = statusLog.split(/\r?\n/).slice(0, 1).join("\n");
+    const context = statusLog.split(/\r?\n/).slice(0, 1).join("\n");
     while (attempt < maxRetries) {
         try {
             const response = await client.chat.completions.create({
@@ -192,18 +185,16 @@ async function classifyStatus(statusLog, maxRetries = 3, retryDelay = 1000) {
                         role: 'user',
                         content: [
                             "Here is the bill's status log so far (oldest first):",
-                            statusLog,
-                            "Here is the current status of the bill:",
-                            currStatus,
-                            "",
-                            "Which of the defined labels does this bill's current status belong to? Only respond with that column name."
+                            context,  
+                            "",                                                      
+                            "Which label applies to the first line (the current status) Only respond with that column name and with exactly one label."
                         ].join("\n")
                     }
                 ],
                 temperature: 0.0,
                 // Increase timeout if supported by the OpenAI client
                 // If not supported, you may need to set a global timeout for axios/fetch
-                timeout: 120000 // 2 minutes
+                timeout: 12000
             });
             const classification = response.choices[0].message.content.trim();
             console.log("Current Status:", currStatus);
