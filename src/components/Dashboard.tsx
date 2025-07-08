@@ -96,6 +96,16 @@ const Dashboard: React.FC = () => {
 
       </div>
 
+      {/* Individual Bill Data Dump */}
+      {individualBillContents && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-xl font-semibold mb-4 text-gray-800">Individual Bill Data</h3>
+          <pre className="bg-gray-100 p-4 rounded overflow-auto text-sm">
+            {JSON.stringify(individualBillContents, null, 2)}
+          </pre>
+        </div>
+      )}
+
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-xl font-semibold mb-4 text-gray-800">About This Application</h3>
         <p className="text-gray-700 mb-3">

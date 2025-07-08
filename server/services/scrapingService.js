@@ -25,18 +25,23 @@ export async function startScraping() {
   shouldCancelScraping = false;
   try {
     const bills = await scrapeBills();
+    const individualBillsData = [];
+    
     for (const bill of bills) {
       console.log("ABOUT TO TEST THE SCRAPE INDIV");
       console.log("bill.bill_url:", bill.bill_url);
       const updatedUrl = bill.bill_url.replace("www.", "data.");
-      await scrapeIndividual(updatedUrl);
+      const individualBillData = await scrapeIndividual(updatedUrl);
+      if (individualBillData) {
+        individualBillsData.push(individualBillData);
+      }
     }
+    
     const savedBillsCount = await saveBills(bills);
     await updateScrapingStats(savedBillsCount, true);
 
-    // await scrapeIndividual(bills.bill_url);
-    // console.log(`bill.bill_url: ${bills.bill_url}`);
-    return bills;
+    // Return both regular bills and individual bill data
+    return { bills, individualBillsData };
   } catch (error) {
     console.error('Error during scraping:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

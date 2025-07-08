@@ -83,7 +83,8 @@ export const ScrapingProvider = ({ children }: { children: ReactNode }) => {
     toast.loading('Starting scraping job...', { id: 'scraping' });
     
     try {
-      await startScraping();
+      const result = await startScraping();
+      setIndividualBillContents(JSON.stringify(result.individualBillsData, null, 2));
       toast.success('Scraping job completed successfully', { id: 'scraping' });
       await refreshBills();
     } catch (err) {

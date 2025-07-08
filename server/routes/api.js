@@ -5,8 +5,11 @@ const router = Router();
 // GET /api/scrape-bills - Start scraping process
 router.get('/scrape-bills', async (req, res) => {
   try {
-    const bills = await startScraping();
-    res.json({ bills });
+    const result = await startScraping();
+    res.json({ 
+      bills: result.bills, 
+      individualBillsData: result.individualBillsData 
+    });
   } catch (error) {
     console.error('Error in scrape-bills endpoint:', error);
     res.status(500).json({ 
