@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useScrapingContext } from '../context/ScrapingContext';
-import { FileText, Clock, AlertTriangle, Check, RefreshCw } from 'lucide-react';
+import { FileText, Clock, AlertTriangle, Check, RefreshCw, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import StatCard from './StatCard';
 
+interface IndividualBill {
+  billTitle: string;
+  description: string;
+  currentReferral: string;
+  introducers: string;
+  measureType: string;
+  statuses: Array<{
+    bill_id: string;
+    chamber: string;
+    date: string;
+    statustext: string;
+  }>;
+}
+
 const Dashboard: React.FC = () => {
+  const [showFoodOnly, setShowFoodOnly] = useState(false);
+  
   const { 
     totalBills, 
     lastScraped, 
@@ -15,6 +31,31 @@ const Dashboard: React.FC = () => {
     startScrapingIndividualJob, 
     individualBillContents
   } = useScrapingContext();
+
+  // Food-related keywords for filtering
+  const FOOD_KEYWORDS = [
+    'agriculture', 'food', 'farm', 'pesticides', 'eating', 'edible', 'meal',
+    'crop', 'harvest', 'organic', 'nutrition', 'diet', 'restaurant', 'cafe',
+    'kitchen', 'cooking', 'beverage', 'drink', 'produce', 'vegetable', 'fruit',
+    'meat', 'dairy', 'grain', 'seed', 'fertilizer', 'irrigation', 'livestock',
+    'poultry', 'fishery', 'aquaculture', 'grocery', 'market', 'vendor'
+  ];
+
+  // Function to check if a bill contains food-related keywords
+  const containsFoodKeywords = (bill: IndividualBill) => {
+    const searchText = `${bill.billTitle || ''} ${bill.description || ''}`.toLowerCase();
+    return FOOD_KEYWORDS.some(keyword => searchText.includes(keyword.toLowerCase()));
+  };
+
+  // Filter individual bill data based on food keywords
+  const filteredBillData = individualBillContents ? 
+    (showFoodOnly ? 
+      JSON.parse(individualBillContents).filter((bill: IndividualBill) => containsFoodKeywords(bill)) :
+      JSON.parse(individualBillContents)
+    ) : [];
+
+  const totalFoodBills = individualBillContents ? 
+    JSON.parse(individualBillContents).filter((bill: IndividualBill) => containsFoodKeywords(bill)).length : 0;
 
   return (
     <div className="space-y-6">
@@ -90,11 +131,41 @@ const Dashboard: React.FC = () => {
           description="Last time data was scraped"
           color="bg-green-50 border-green-200"
         />
-
-
-
-
+        <StatCard 
+          title="Food-Related Bills"
+          value={totalFoodBills.toString()} 
+          icon={<Filter className="w-8 h-8 text-green-500" />}
+          description="Bills containing food keywords"
+          color="bg-green-50 border-green-200"
+        />
       </div>
+
+      {/* Filter Controls */}
+      {individualBillContents && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-semibold text-gray-800">
+              {showFoodOnly ? 'Food-Related Bills Only' : 'All Individual Bills'}
+            </h3>
+            <button
+              onClick={() => setShowFoodOnly(!showFoodOnly)}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              {showFoodOnly ? 'Show All Bills' : 'Show Food Bills Only'}
+            </button>
+          </div>
+          <p className="text-gray-600 mb-4">
+            {showFoodOnly 
+              ? `Showing ${filteredBillData.length} food-related bills out of ${JSON.parse(individualBillContents).length} total bills`
+              : `Showing all ${JSON.parse(individualBillContents).length} bills`
+            }
+          </p>
+          <pre className="bg-gray-100 p-4 rounded overflow-auto text-sm">
+            {JSON.stringify(filteredBillData, null, 2)}
+          </pre>
+        </div>
+      )}
 
       {/* Individual Bill Data Dump */}
       {individualBillContents && (
