@@ -41,7 +41,7 @@ router.get('/', async (req, res) => {
     const $ = cheerio.load(response.data);
     const bills = [];
     
-    $('table tr').slice(1, 26).each((i, element) => {
+    $('table tr').slice(1).each((i, element) => {
       if (i === 0) return; // skip header row
       
       // <a>
@@ -102,7 +102,7 @@ router.get('/', async (req, res) => {
         const bills = [];
 
         $('table tr').each((i, element) => {
-          if (i === 0 || i > 25) return;
+          if (i === 0) return;
 
           const billLink = $(element).find('td:nth-child(1) a');
           const billUrl = billLink.attr('href');

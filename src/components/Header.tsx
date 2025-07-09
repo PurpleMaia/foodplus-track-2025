@@ -1,9 +1,9 @@
 import React from 'react';
-import { FileText, BarChart2, Settings } from 'lucide-react';
+import { FileText, BarChart2, Settings, Table } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'bills' | 'controls';
-  setActiveTab: (tab: 'dashboard' | 'bills' | 'controls') => void;
+  activeTab: 'dashboard' | 'bills' | 'spreadsheet' | 'controls';
+  setActiveTab: (tab: 'dashboard' | 'bills' | 'spreadsheet' | 'controls') => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
@@ -41,6 +41,18 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
               Bills
             </button>
             
+            <button
+              onClick={() => setActiveTab('spreadsheet')}
+              className={`flex items-center px-4 py-2 rounded-md transition-all ${
+                activeTab === 'spreadsheet'
+                  ? 'bg-amber-500 text-white'
+                  : 'text-white/80 hover:bg-blue-700'
+              }`}
+            >
+              <Table className="w-5 h-5 mr-2" />
+              Spreadsheet
+            </button>
+
             <button
               onClick={() => setActiveTab('controls')}
               className={`flex items-center px-4 py-2 rounded-md transition-all ${
