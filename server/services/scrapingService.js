@@ -71,7 +71,7 @@ export async function scrapeBills() {
     });
     const $ = cheerio.load(response.data);
     const bills = [];
-    $('table tr').slice(1, 25).each((i, element) => {
+    $('table tr').slice(1, 200).each((i, element) => {
       if (i === 0) return;
       const billLink = $(element).find('a.report');
       const billUrl = billLink.attr('href'); //www.capitol. replace it data. using regex
