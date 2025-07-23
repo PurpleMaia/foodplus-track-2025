@@ -14,8 +14,8 @@ export const startScraping = async () => {
       const error = await response.json();
       throw new Error(error.details || 'Failed to scrape bills');
     }
-    const { bills } = await response.json();    
-    return bills;
+    const { bills, individualBillsData } = await response.json();    
+    return { bills, individualBillsData };
   } catch (error) {
     console.error('Error during scraping:', error);
     throw error;

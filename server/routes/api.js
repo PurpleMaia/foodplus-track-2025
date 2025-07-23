@@ -5,8 +5,11 @@ const router = Router();
 // GET /api/scrape-bills - Start scraping process
 router.get('/scrape-bills', async (req, res) => {
   try {
-    const bills = await startScraping();
-    res.json({ bills });
+    const result = await startScraping();
+    res.json({ 
+      bills: result.bills, 
+      individualBillsData: result.individualBillsData 
+    });
   } catch (error) {
     console.error('Error in scrape-bills endpoint:', error);
     res.status(500).json({ 
@@ -59,7 +62,9 @@ router.post('/update-scraping-stats', async (req, res) => {
 // GET /api/scrape-individual
 router.get('/scrape-individual', async (req, res) =>{
   try{
-    const individualBill = await scrapeIndividual()
+    const billID = req.query.billID
+    console.log('from query params billID:', billID)
+    const individualBill = await scrapeIndividual(billID)
     res.json({ individualBill });
   }catch(error){
     console.log('Error in scrape-individual endpoint:', error);
