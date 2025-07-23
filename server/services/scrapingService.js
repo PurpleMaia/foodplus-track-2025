@@ -37,8 +37,8 @@ export async function startScraping() {
       }      
     }
     
-    // const savedBillsCount = await saveBills(bills);
-    // await updateScrapingStats(savedBillsCount, true);
+    const savedBillsCount = await saveBills(bills);
+    await updateScrapingStats(savedBillsCount, true);
 
     // Return both regular bills and individual bill data
     return { bills, individualBillsData };
@@ -292,7 +292,7 @@ export async function scrapeIndividual(billClassifier) {
     
     // const statuses = $('#ctl00_MainContent_UpdatePanel1').text().trim();
     
-    const statuses = []
+    const updates = []
     $('#MainContent_GridViewStatus tr').each((i, row) => {
       // console.log('Number of status rows:', $('#MainContent_GridViewStatus tr').length);
 
@@ -303,7 +303,7 @@ export async function scrapeIndividual(billClassifier) {
         const statusText = $(tds[2]).text().trim();
 
         // building row in status_updates
-        statuses.push({
+        updates.push({
           bill_id: billID, // FK
           chamber: chamber,
           date: date,
@@ -312,6 +312,7 @@ export async function scrapeIndividual(billClassifier) {
       }
     });
 
+    // data object of inidividual web page scrape (only caring about updates for now...)
     const billData = {
       introducers: introducers,
       billTitle: billTitle,
@@ -319,15 +320,13 @@ export async function scrapeIndividual(billClassifier) {
       // currentStatus: currentStatus,
       description: description,
       measureType: measureType,
-      statuses: statuses
+      updates: updates
     };
 
-    console.log(billData);
+    // console.log(billData);
 
-    // await db
-    //   .insertInto('status_updates')
-    //   .values(statuses)
-    //   .execute();
+    console.log('scraped updates:', updates)
+    await saveUpdates(updates)    
 
     return billData;
 
@@ -335,4 +334,45 @@ export async function scrapeIndividual(billClassifier) {
     console.error('Error scraping bills:', error);
   }
 
+}
+
+export async function saveUpdates(updates) {
+  if (!updates || updates.length === 0) {
+    console.log('No bills to save');
+    return 0;
+  }
+  console.log(`Attempting to save ${updates.length} updates to database`);
+  let successCount = 0;
+  for (const update of updates) {
+    if (shouldCancelScraping) {
+      console.log('Saving cancelled by user');
+      break;
+    }
+    try {
+      const existingUpdate = await db
+        .selectFrom('status_updates')
+        .select(['id', 'bill_id', 'chamber', 'date', 'statustext'])
+        .where('bill_id', '=', update.bill_id)
+        .where('chamber', '=', update.chamber)
+        .where('date', '=', update.date)
+        .where('statustext', '=', update.statustext)
+        .limit(1)
+        .executeTakeFirst();
+      console.log('existingUpdate:', existingUpdate);
+      if (existingUpdate) {
+        console.log('found the same update, skipping insertion...')
+      } else {
+        console.log('new update, inserting into db...')
+        await db
+          .insertInto('status_updates')
+          .values(updates)
+          .execute();
+      }
+      successCount++;
+    } catch (error) {
+      console.error('Error saving update:', error);
+    }
+  }
+  console.log(`Successfully saved ${successCount} updates`);
+  return successCount;
 }
