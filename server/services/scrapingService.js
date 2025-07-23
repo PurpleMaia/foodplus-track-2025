@@ -1,7 +1,7 @@
 import { db } from '../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { writeFileSync } from 'fs';
+import { read, writeFileSync } from 'fs';
 
 // Flag to track if scraping should be cancelled
 let shouldCancelScraping = false;
@@ -30,15 +30,15 @@ export async function startScraping() {
     for (const bill of bills) {
       console.log("ABOUT TO TEST THE SCRAPE INDIV");
       console.log("bill.bill_url:", bill.bill_url);
-      const updatedUrl = bill.bill_url.replace("www.", "data.");
-      const individualBillData = await scrapeIndividual(updatedUrl);
+      const billClassifier = bill.bill_url
+      const individualBillData = await scrapeIndividual(billClassifier);
       if (individualBillData) {
         individualBillsData.push(individualBillData);
-      }
+      }      
     }
     
-    const savedBillsCount = await saveBills(bills);
-    await updateScrapingStats(savedBillsCount, true);
+    // const savedBillsCount = await saveBills(bills);
+    // await updateScrapingStats(savedBillsCount, true);
 
     // Return both regular bills and individual bill data
     return { bills, individualBillsData };
@@ -71,7 +71,7 @@ export async function scrapeBills() {
     });
     const $ = cheerio.load(response.data);
     const bills = [];
-    $('table tr').slice(1, 200).each((i, element) => {
+    $('table tr').slice(1, 5).each((i, element) => {
       if (i === 0) return;
       const billLink = $(element).find('a.report');
       const billUrl = billLink.attr('href'); //www.capitol. replace it data. using regex
@@ -226,8 +226,45 @@ export async function updateScrapingStats(billsSaved, success, errorMessage) {
 
 console.log("GOING IN");
 
-export async function scrapeIndividual(INDIVIDUAL_URL) {
-  console.log("individual Url: ", INDIVIDUAL_URL);
+export async function scrapeIndividual(billClassifier) {
+  console.log('scrapeIndividual classifer:', billClassifier)
+
+  let url, billID
+  if (billClassifier.startsWith('https://')) {
+    // bill url was passed
+    console.log('called by scrape-bills, using billURL...')
+
+    // get bill_id for foreign key constraints in later insertions
+    const result = await db
+      .selectFrom('bills')
+      .select('id')
+      .where('bill_url', '=', billClassifier)
+      .executeTakeFirst();
+  
+    console.log('bill id:', result.id)
+
+    billID = result.id
+    url = billClassifier
+  } else {
+    // bill id was passed through api call
+    console.log('called by api (query params), using billID...')
+    billID = billClassifier
+
+    console.log("from inside scrapeIndividual billID: ", billID);
+
+    // get bill_url from passed in billID parameter
+    const result = await db
+      .selectFrom('bills')
+      .select('bill_url')
+      .where('id', '=', billID)
+      .executeTakeFirst();
+  
+    console.log('bill url:', result.bill_url)
+    url = result.bill_url
+  }
+
+  const updatedUrl = url.replace("www.", "data.");
+  const INDIVIDUAL_URL = updatedUrl
   try {
     // ==== test-scrape.js ====
      console.log('Starting to test scrape the individual page')
@@ -246,9 +283,6 @@ export async function scrapeIndividual(INDIVIDUAL_URL) {
 
     const $ = cheerio.load(response.data)
 
-
-
-
     // 5. Extract introducers
     const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
     const billTitle = $('#MainContent_LinkButtonMeasure').text().trim();
@@ -257,15 +291,6 @@ export async function scrapeIndividual(INDIVIDUAL_URL) {
     const measureType = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
     
     // const statuses = $('#ctl00_MainContent_UpdatePanel1').text().trim();
-
-    // get billID for foreign key insertion constraints
-    const billID = await db
-      .selectFrom('bills')
-      .select('id')
-      .where('bill_number', '=', billTitle)
-      .executeTakeFirst();
-
-    console.log('bill_id:', billID.id)
     
     const statuses = []
     $('#MainContent_GridViewStatus tr').each((i, row) => {
@@ -279,7 +304,7 @@ export async function scrapeIndividual(INDIVIDUAL_URL) {
 
         // building row in status_updates
         statuses.push({
-          bill_id: billID.id, // FK
+          bill_id: billID, // FK
           chamber: chamber,
           date: date,
           statustext: statusText
@@ -299,10 +324,10 @@ export async function scrapeIndividual(INDIVIDUAL_URL) {
 
     console.log(billData);
 
-    await db
-      .insertInto('status_updates')
-      .values(statuses)
-      .execute();
+    // await db
+    //   .insertInto('status_updates')
+    //   .values(statuses)
+    //   .execute();
 
     return billData;
 

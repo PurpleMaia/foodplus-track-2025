@@ -62,7 +62,9 @@ router.post('/update-scraping-stats', async (req, res) => {
 // GET /api/scrape-individual
 router.get('/scrape-individual', async (req, res) =>{
   try{
-    const individualBill = await scrapeIndividual()
+    const billID = req.query.billID
+    console.log('from query params billID:', billID)
+    const individualBill = await scrapeIndividual(billID)
     res.json({ individualBill });
   }catch(error){
     console.log('Error in scrape-individual endpoint:', error);
