@@ -262,6 +262,13 @@ export async function scrapeIndividual(billClassifier) {
     console.log('bill url:', result.bill_url)
     url = result.bill_url
   }
+  
+  // error handle if the url is from the old scrape (has all the html)
+  if (url.startsWith('<a')) {
+    const match = url.match(/href=(["']?)([^"'\s>]+)\1/);
+    url = match ? match[2] : null;
+    console.log('Had to convert:', url)
+  }
 
   const updatedUrl = url.replace("www.", "data.");
   const INDIVIDUAL_URL = updatedUrl
