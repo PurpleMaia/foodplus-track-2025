@@ -232,7 +232,7 @@ export async function scrapeIndividual(billClassifier) {
   let url, billID
   if (billClassifier.startsWith('https://')) {
     // bill url was passed
-    console.log('called by scrape-bills, using billURL...')
+    console.log('using billURL...')
 
     // get bill_id for foreign key constraints in later insertions
     const result = await db
@@ -241,16 +241,14 @@ export async function scrapeIndividual(billClassifier) {
       .where('bill_url', '=', billClassifier)
       .executeTakeFirst();
   
-    console.log('bill id:', result.id)
+    console.log('found bill id:', result.id)
 
     billID = result.id
     url = billClassifier
   } else {
     // bill id was passed through api call
-    console.log('called by api (query params), using billID...')
+    console.log('using billID...')
     billID = billClassifier
-
-    console.log("from inside scrapeIndividual billID: ", billID);
 
     // get bill_url from passed in billID parameter
     const result = await db
@@ -259,7 +257,7 @@ export async function scrapeIndividual(billClassifier) {
       .where('id', '=', billID)
       .executeTakeFirst();
   
-    console.log('bill url:', result.bill_url)
+    console.log('found bill url:', result.bill_url)
     url = result.bill_url
   }
   
