@@ -40,8 +40,17 @@ export interface ScrapingStats {
   success: Generated<boolean | null>;
 }
 
+export interface StatusUpdates {
+  bill_id: string;
+  chamber: string;
+  date: string;
+  id: Generated<string>;
+  statustext: string;
+}
+
 export interface DB {
   bills: Bills;
   schema_migrations: SchemaMigrations;
   scraping_stats: ScrapingStats;
+  status_updates: StatusUpdates;
 }

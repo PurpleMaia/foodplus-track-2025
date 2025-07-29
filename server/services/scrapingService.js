@@ -1,6 +1,7 @@
 import { db } from '../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import { read, writeFileSync } from 'fs';
 
 // Flag to track if scraping should be cancelled
 let shouldCancelScraping = false;
@@ -24,9 +25,23 @@ export async function startScraping() {
   shouldCancelScraping = false;
   try {
     const bills = await scrapeBills();
+    const individualBillsData = [];
+    
+    for (const bill of bills) {
+      console.log("ABOUT TO TEST THE SCRAPE INDIV");
+      console.log("bill.bill_url:", bill.bill_url);
+      const billClassifier = bill.bill_url
+      const individualBillData = await scrapeIndividual(billClassifier);
+      if (individualBillData) {
+        individualBillsData.push(individualBillData);
+      }      
+    }
+    
     const savedBillsCount = await saveBills(bills);
     await updateScrapingStats(savedBillsCount, true);
-    return bills;
+
+    // Return both regular bills and individual bill data
+    return { bills, individualBillsData };
   } catch (error) {
     console.error('Error during scraping:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -56,7 +71,7 @@ export async function scrapeBills() {
     });
     const $ = cheerio.load(response.data);
     const bills = [];
-    $('table tr').slice(1, 26).each((i, element) => {
+    $('table tr').slice(1, 5).each((i, element) => {
       if (i === 0) return;
       const billLink = $(element).find('a.report');
       const billUrl = billLink.attr('href'); //www.capitol. replace it data. using regex
@@ -104,7 +119,7 @@ export async function scrapeBills() {
         const $ = cheerio.load(retryResponse.data);
         const bills = [];
         $('table tr').each((i, element) => {
-          if (i === 0 || i > 25) return;
+          if (i === 0) return;
           const billLink = $(element).find('td:nth-child(1) a');
           const billUrl = billLink.attr('href');
           const billNumber = billLink.text().trim();
@@ -207,9 +222,54 @@ export async function updateScrapingStats(billsSaved, success, errorMessage) {
 }
 
 // Scrape individual bill 
-const INDIVIDUAL_URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype=SB&billnumber=1186&year=2025'; // example endpoint: bills dataset
+// const INDIVIDUAL_URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype=SB&billnumber=1186&year=2025'; // example endpoint: bills dataset
 
-export async function scrapeIndividual() {
+console.log("GOING IN");
+
+export async function scrapeIndividual(billClassifier) {
+  console.log('scrapeIndividual classifer:', billClassifier)
+
+  let url, billID
+  if (billClassifier.startsWith('https://')) {
+    // bill url was passed
+    console.log('using billURL...')
+
+    // get bill_id for foreign key constraints in later insertions
+    const result = await db
+      .selectFrom('bills')
+      .select('id')
+      .where('bill_url', '=', billClassifier)
+      .executeTakeFirst();
+  
+    console.log('found bill id:', result.id)
+
+    billID = result.id
+    url = billClassifier
+  } else {
+    // bill id was passed through api call
+    console.log('using billID...')
+    billID = billClassifier
+
+    // get bill_url from passed in billID parameter
+    const result = await db
+      .selectFrom('bills')
+      .select('bill_url')
+      .where('id', '=', billID)
+      .executeTakeFirst();
+  
+    console.log('found bill url:', result.bill_url)
+    url = result.bill_url
+  }
+  
+  // error handle if the url is from the old scrape (has all the html)
+  if (url.startsWith('<a')) {
+    const match = url.match(/href=(["']?)([^"'\s>]+)\1/);
+    url = match ? match[2] : null;
+    console.log('Had to convert:', url)
+  }
+
+  const updatedUrl = url.replace("www.", "data.");
+  const INDIVIDUAL_URL = updatedUrl
   try {
     // ==== test-scrape.js ====
      console.log('Starting to test scrape the individual page')
@@ -224,62 +284,100 @@ export async function scrapeIndividual() {
       timeout: 30000,
       maxRedirects: 5,
     });
-    // =========================
-    
+    // =========================    
+
     const $ = cheerio.load(response.data)
 
-    // $('span').each((i, el) => {
-    // const id = $(el).attr('id');
-    // const text = $(el).text().trim();
-    //   if (id) {
-    //     console.log(`${id} => ${text}`);
-    //   }
-    // });
-
     // 5. Extract introducers
-    const introducers = $('#ctl00_MainContent_ListView1_ctrl0_introducerLabel').text().trim();
-    const billTitle = $('#ctl00_MainContent_ListView1_ctrl0_titleLabel').text().trim();
-    const currentReferral = $('#ctl00_MainContent_ListView1_ctrl0_current_referralLabel').text().trim();
-    const currentStatus = $('#ctl00_MainContent_ListView1_ctrl0_statusLabel').text().trim();
-    const description = $('#ctl00_MainContent_ListView1_ctrl0_descriptionLabel').text().trim();
-    const measureType = $('#ctl00_MainContent_ListView1_ctrl0_measuretypeLabel').text().trim();
+    const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
+    const billTitle = $('#MainContent_LinkButtonMeasure').text().trim();
+    const currentReferral = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
+    const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
+    const measureType = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
+    
     // const statuses = $('#ctl00_MainContent_UpdatePanel1').text().trim();
-
-    const statuses = []
-    $('#ctl00_MainContent_GridViewStatus tr').each((i, row) => {
-      console.log('Number of status rows:', $('#ctl00_MainContent_GridViewStatus tr').length);
+    
+    const updates = []
+    $('#MainContent_GridViewStatus tr').each((i, row) => {
+      // console.log('Number of status rows:', $('#MainContent_GridViewStatus tr').length);
 
       const tds = $(row).find('td');
       if (tds.length === 3) {
         const date = $(tds[0]).text().trim();
+        const chamber = $(tds[1]).text().trim();
         const statusText = $(tds[2]).text().trim();
 
-        console.log(`✅ ${date} — ${statusText}`)
-        statuses.push({
+        // building row in status_updates
+        updates.push({
+          bill_id: billID, // FK
+          chamber: chamber,
           date: date,
-          statusText: statusText
-        });
-        // if (statusText.toLowerCase().includes('introduc')) {
-        //   console.log(`✅ ${date} — ${statusText}`);
-        // }
+          statustext: statusText
+        });    
       }
     });
 
+    // data object of inidividual web page scrape (only caring about updates for now...)
     const billData = {
       introducers: introducers,
       billTitle: billTitle,
       currentReferral: currentReferral,
-      currentStatus: currentStatus,
+      // currentStatus: currentStatus,
       description: description,
       measureType: measureType,
-      statuses: statuses
+      updates: updates
     };
-    
+
+    // console.log(billData);
+
+    console.log('scraped updates:', updates)
+    await saveUpdates(updates)    
+
     return billData;
-    
+
   } catch (error) {
     console.error('Error scraping bills:', error);
   }
 
+}
 
+export async function saveUpdates(updates) {
+  if (!updates || updates.length === 0) {
+    console.log('No bills to save');
+    return 0;
+  }
+  console.log(`Attempting to save ${updates.length} updates to database`);
+  let successCount = 0;
+  for (const update of updates) {
+    if (shouldCancelScraping) {
+      console.log('Saving cancelled by user');
+      break;
+    }
+    try {
+      const existingUpdate = await db
+        .selectFrom('status_updates')
+        .select(['id', 'bill_id', 'chamber', 'date', 'statustext'])
+        .where('bill_id', '=', update.bill_id)
+        .where('chamber', '=', update.chamber)
+        .where('date', '=', update.date)
+        .where('statustext', '=', update.statustext)
+        .limit(1)
+        .executeTakeFirst();
+      console.log('existingUpdate:', existingUpdate);
+      if (existingUpdate) {
+        console.log('found the same update, skipping insertion...')
+      } else {
+        console.log('new update, inserting into db...')
+        await db
+          .insertInto('status_updates')
+          .values(updates)
+          .execute();
+      }
+      successCount++;
+    } catch (error) {
+      console.error('Error saving update:', error);
+    }
+  }
+  console.log(`Successfully saved ${successCount} updates`);
+  return successCount;
 }
