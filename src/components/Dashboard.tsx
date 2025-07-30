@@ -126,11 +126,68 @@ const Dashboard: React.FC = () => {
         />
         <StatCard 
           title="Individual Bill Scrape"
+          value={
+            individualBillContents ? (
+              <div className="w-full">
+                <div className="text-sm text-gray-600 mb-2">
+                  {JSON.parse(individualBillContents).length} bills scraped
+                </div>
+                <div className="overflow-x-auto max-h-64">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Bill
+                        </th>
+                        <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-2 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-100">
+                      {JSON.parse(individualBillContents).slice(0, 5).map((bill: IndividualBill, index: number) => {
+                        const latestStatus = bill.statuses && bill.statuses.length > 0 ? bill.statuses[0] : null;
+                        return (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-2 py-1 text-xs text-gray-900 max-w-24 truncate">
+                              {bill.billTitle}
+                            </td>
+                            <td className="px-2 py-1 text-xs text-gray-900">
+                              {bill.measureType}
+                            </td>
+                            <td className="px-2 py-1 text-xs text-gray-900 max-w-32 truncate">
+                              {latestStatus?.statustext || 'No status'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {JSON.parse(individualBillContents).length > 5 && (
+                    <div className="text-xs text-gray-500 mt-1 text-center">
+                      +{JSON.parse(individualBillContents).length - 5} more bills
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              'No data'
+            )
+          }
+          icon={<FileText className="w-8 h-8 text-green-500" />}
+          description="Individual bills scraped"
+          color="bg-green-50 border-green-200"
+        />
+        {/* <StatCard 
+          title="Individual Bill Scrape"
           value={individualBillContents} 
           icon={<FileText className="w-8 h-8 text-green-500" />}
           description="Last time data was scraped"
           color="bg-green-50 border-green-200"
-        />
+        /> */}
         <StatCard 
           title="Food-Related Bills"
           value={totalFoodBills.toString()} 
@@ -167,15 +224,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Individual Bill Data Dump */}
-      {individualBillContents && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-xl font-semibold mb-4 text-gray-800">Individual Bill Data</h3>
-          <pre className="bg-gray-100 p-4 rounded overflow-auto text-sm">
-            {JSON.stringify(individualBillContents, null, 2)}
-          </pre>
-        </div>
-      )}
+
 
       <div className="bg-white rounded-lg shadow p-6">
         <h3 className="text-xl font-semibold mb-4 text-gray-800">About This Application</h3>

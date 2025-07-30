@@ -33,7 +33,9 @@ export async function startScraping() {
       const billClassifier = bill.bill_url
       const individualBillData = await scrapeIndividual(billClassifier);
       if (individualBillData) {
+        console.log("THIS IS THE INDIV BILL DATA:"); 
         individualBillsData.push(individualBillData);
+        console.log("THIS IS THE INDIV BILL DATA:"); 
       }      
     }
     

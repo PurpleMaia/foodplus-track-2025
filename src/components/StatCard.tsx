@@ -2,7 +2,7 @@ import React, { ReactNode } from 'react';
 
 interface StatCardProps {
   title: string;
-  value: string;
+  value: string | ReactNode;
   icon: ReactNode;
   description: string;
   color: string;
@@ -23,7 +23,11 @@ const StatCard: React.FC<StatCardProps> = ({
         <div>
           <h3 className="text-gray-600 text-sm font-medium">{title}</h3>
           <div className="mt-2 flex flex-col">
-            <p className="text-2xl font-bold text-gray-900">{value}</p>
+            {typeof value === 'string' ? (
+              <p className="text-2xl font-bold text-gray-900">{value}</p>
+            ) : (
+              <div className="text-gray-900">{value}</div>
+            )}
             {subValue && <p className="text-gray-500 text-sm">{subValue}</p>}
           </div>
           <p className="mt-2 text-gray-500 text-sm">{description}</p>
