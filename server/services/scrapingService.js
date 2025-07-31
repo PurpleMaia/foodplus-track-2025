@@ -354,11 +354,11 @@ export async function scrapeIndividual(billClassifier) {
       }
 
       console.log('about to insert new bill into db: ', newBillData)
-      // const inserted = await db
-      //   .insertInto('bills')
-      //   .values(newBillData)
-      //   .returning('bill_id')
-      //   .execute()
+      const inserted = await db
+        .insertInto('bills')
+        .values(newBillData)
+        .returning('bill_id')
+        .execute()
 
       updates.map((update) => update.bill_id = inserted.bill_id)
     }
