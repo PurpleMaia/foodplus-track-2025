@@ -264,6 +264,7 @@ export async function scrapeIndividual(billClassifier) {
       .executeTakeFirst();
   
     console.log('found bill url:', result.bill_url)
+    found = true
     url = result.bill_url
   }
   
@@ -314,9 +315,11 @@ export async function scrapeIndividual(billClassifier) {
         const chamber = $(tds[1]).text().trim();
         const statusText = $(tds[2]).text().trim();
 
-        if (!found && i == 1) {   
-          currentStatusString = chamber + ' ' + date + ': ' + statusText
-          console.log('currentStatusString: ', currentStatusString)     
+        if (!found) {
+          if (i == 1) {
+            currentStatusString = chamber + ' ' + date + ': ' + statusText
+            console.log('currentStatusString: ', currentStatusString)     
+          }   
         } 
 
         // building row in status_updates
@@ -351,11 +354,11 @@ export async function scrapeIndividual(billClassifier) {
       }
 
       console.log('about to insert new bill into db: ', newBillData)
-      const inserted = await db
-        .insertInto('bills')
-        .values(newBillData)
-        .returning('bill_id')
-        .execute()
+      // const inserted = await db
+      //   .insertInto('bills')
+      //   .values(newBillData)
+      //   .returning('bill_id')
+      //   .execute()
 
       updates.map((update) => update.bill_id = inserted.bill_id)
     }
