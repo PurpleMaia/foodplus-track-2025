@@ -238,7 +238,7 @@ export async function scrapeIndividual(billClassifier) {
     const result = await db
       .selectFrom('bills')
       .select('id')
-      .where('bill_url', 'ilike', billClassifier)
+      .where('bill_url', 'ilike', `${billClassifier}%`)
       .executeTakeFirst();
   
     if (result) {
