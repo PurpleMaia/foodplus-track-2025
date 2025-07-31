@@ -229,7 +229,7 @@ console.log("GOING IN");
 export async function scrapeIndividual(billClassifier) {
   console.log('scrapeIndividual classifer:', billClassifier)
 
-  let url, billID
+  let url, billID, found
   if (billClassifier.startsWith('https://')) {
     // bill url was passed
     console.log('using billURL...')
@@ -238,15 +238,21 @@ export async function scrapeIndividual(billClassifier) {
     const result = await db
       .selectFrom('bills')
       .select('id')
-      .where('bill_url', '=', billClassifier)
+      .where('bill_url', 'ilike', billClassifier)
       .executeTakeFirst();
   
-    console.log('found bill id:', result.id)
+    if (result) {
+      console.log('found bill id and was in db:', result.id)
+      found = true
+      billID = result.id
+    } else {
+      console.log('bill is not in database...')
+      found = false
+    }
 
-    billID = result.id
     url = billClassifier
   } else {
-    // bill id was passed through api call
+    // bill id was passed
     console.log('using billID...')
     billID = billClassifier
 
@@ -266,7 +272,7 @@ export async function scrapeIndividual(billClassifier) {
     const match = url.match(/href=(["']?)([^"'\s>]+)\1/);
     url = match ? match[2] : null;
     console.log('Had to convert:', url)
-  }
+  }  
 
   const updatedUrl = url.replace("www.", "data.");
   const INDIVIDUAL_URL = updatedUrl
@@ -286,18 +292,19 @@ export async function scrapeIndividual(billClassifier) {
     });
     // =========================    
 
-    const $ = cheerio.load(response.data)
+    const $ = cheerio.load(response.data)    
 
-    // 5. Extract introducers
+    // 5. Extract data in case bill was not found in database    
     const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
-    const billTitle = $('#MainContent_LinkButtonMeasure').text().trim();
+    const billNumber = $('#MainContent_LinkButtonMeasure').text().trim();
     const currentReferral = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
     const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
-    const measureType = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
-    
+    const measureTitle = $('#MainContent_ListView1_measure_titleLabel_0').text().trim(); // bill_title
+      
     // const statuses = $('#ctl00_MainContent_UpdatePanel1').text().trim();
     
     const updates = []
+    let currentStatusString
     $('#MainContent_GridViewStatus tr').each((i, row) => {
       // console.log('Number of status rows:', $('#MainContent_GridViewStatus tr').length);
 
@@ -306,6 +313,11 @@ export async function scrapeIndividual(billClassifier) {
         const date = $(tds[0]).text().trim();
         const chamber = $(tds[1]).text().trim();
         const statusText = $(tds[2]).text().trim();
+
+        if (!found && i == 1) {   
+          currentStatusString = chamber + ' ' + date + ': ' + statusText
+          console.log('currentStatusString: ', currentStatusString)     
+        } 
 
         // building row in status_updates
         updates.push({
@@ -317,18 +329,36 @@ export async function scrapeIndividual(billClassifier) {
       }
     });
 
-    // data object of inidividual web page scrape (only caring about updates for now...)
+    // data object of inidividual web page scrape (used for insertion)
     const billData = {
-      introducers: introducers,
-      billTitle: billTitle,
-      currentReferral: currentReferral,
-      // currentStatus: currentStatus,
+      bill_url: url,
+      bill_number: billNumber,
+      bill_title: measureTitle,      
       description: description,
-      measureType: measureType,
-      updates: updates
+      committee_assignment: currentReferral,    
+      introducer: introducers,
+      updates: updates      
     };
 
-    // console.log(billData);
+    if (!found) {
+      const { updates, ...restOfBillData } = billData; // remove updates from objects and capture the rest
+
+      const newBillData = {
+        ...restOfBillData,
+        current_status_string: currentStatusString,
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+
+      console.log('about to insert new bill into db: ', newBillData)
+      const inserted = await db
+        .insertInto('bills')
+        .values(newBillData)
+        .returning('bill_id')
+        .execute()
+
+      updates.map((update) => update.bill_id = inserted.bill_id)
+    }
 
     console.log('scraped updates:', updates)
     await saveUpdates(updates)    
