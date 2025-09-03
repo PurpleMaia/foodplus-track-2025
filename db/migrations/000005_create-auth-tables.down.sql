@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS "user_bills";
+DROP TABLE IF EXISTS "auth_key";
+DROP TABLE IF EXISTS "sessions";
+DROP TABLE IF EXISTS "user";
