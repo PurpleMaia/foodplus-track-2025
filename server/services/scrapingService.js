@@ -45,7 +45,7 @@ export async function main() {
 }
 
 // Start the scraping process for the Hawaii State Legislature website
-e// Scrape bills from the Hawaii State Legislature website
+// Scrape bills from the Hawaii State Legislature website
 export async function scrapeBills(url) {
   try {
     console.log('Starting to scrape bills from Hawaii Legislature website');
@@ -326,7 +326,6 @@ export async function scrapeIndividual(billClassifier) {
           bill_title: billTitle,
           introducer: introducers,
           bill_number: billNumber,
-          food_related: true,
           updated_at: new Date(),
         }).returning('bills.id').executeTakeFirst();
       console.log('[INDIVIDUAL] New bill inserted with ID:', newBillId.id)
