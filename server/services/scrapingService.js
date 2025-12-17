@@ -23,7 +23,7 @@ const SCRAPING_URL = 'https://data.capitol.hawaii.gov/advreports/advreport.aspx?
 export async function startScraping() {
   shouldCancelScraping = false;
   try {
-    const bills = await scrapeBills();
+    const bills = await scrapeBills(SCRAPING_URL);
     const individualBillsData = [];
     
     for (const bill of bills) {
@@ -55,11 +55,11 @@ export async function cancelScraping() {
 }
 
 // Scrape bills from the Hawaii State Legislature website
-export async function scrapeBills() {
+export async function scrapeBills(url) {
   try {
     console.log('Starting to scrape bills from Hawaii Legislature website');
     await delay(1000);
-    const response = await axios.get(SCRAPING_URL, {
+    const response = await axios.get(url, {
       headers: {
         'User-Agent': getRandomUserAgent(),
         Accept: 'text/html',
