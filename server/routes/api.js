@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { startScraping, saveBills, updateScrapingStats, scrapeIndividual } from '../services/scrapingService.js';
+import { getAllBillsContext } from '../services/bills.js';
 const router = Router();
 
 // GET /api/scrape-bills - Start scraping process
@@ -71,3 +72,17 @@ router.post('/scrape-individual', async (req, res) =>{
   }
 })
 export default router;
+
+// GET /api/all-bills-context
+router.get('/all-bills-context', async (req, res) => {
+  try {
+    const { allBills, foodBills, lastScrapeTime } = await getAllBillsContext();
+    res.json({ allBills, foodBills, lastScrapeTime });
+  } catch (error) {
+    console.error('Error in all-bills-context endpoint:', error);
+    res.status(500).json({ 
+      error: 'Failed to get bills context',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});

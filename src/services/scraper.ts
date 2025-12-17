@@ -1,6 +1,3 @@
-// Frontend scraping service - calls backend API endpoints
-// This version doesn't import the database client
-
 /**
  * Start the scraping process for the Hawaii State Legislature website
  * Only calls the backend API, which handles all scraping, saving, and stats logic.
@@ -41,13 +38,3 @@ export const scrapeIndividual = async () => {
     throw error;
   }
 };
-
-
-/**
- * Cancel the scraping process (no-op on frontend, but kept for API compatibility)
- */
-export const cancelScraping = async () => {
-  // Optionally, you could call a backend endpoint to cancel a running job
-  // For now, this is a no-op on the frontend
-};
-

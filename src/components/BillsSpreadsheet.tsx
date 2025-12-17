@@ -1,62 +1,11 @@
 import React, { useState } from 'react';
 import { useScrapingContext } from '../context/ScrapingContext';
-import { Search, Download, Filter } from 'lucide-react';
-
-interface IndividualBill {
-  billTitle: string;
-  description: string;
-  currentReferral: string;
-  introducers: string;
-  measureType: string;
-  statuses: Array<{
-    bill_id: string;
-    chamber: string;
-    date: string;
-    statustext: string;
-  }>;
-}
+import { Search, Download } from 'lucide-react';
+import { Bill } from '../types';
 
 const BillsSpreadsheet: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [showFoodOnly, setShowFoodOnly] = useState(false);
-  const { individualBillContents } = useScrapingContext();
-
-  // Food-related keywords for filtering
-  const FOOD_KEYWORDS = [
-    'agriculture', 'food', 'farm', 'pesticides', 'eating', 'edible', 'meal',
-    'crop', 'harvest', 'organic', 'nutrition', 'diet', 'restaurant', 'cafe',
-    'kitchen', 'cooking', 'beverage', 'drink', 'produce', 'vegetable', 'fruit',
-    'meat', 'dairy', 'grain', 'seed', 'fertilizer', 'irrigation', 'livestock',
-    'poultry', 'fishery', 'aquaculture', 'grocery', 'market', 'vendor'
-  ];
-
-  // Function to check if a bill contains food-related keywords
-  const containsFoodKeywords = (bill: IndividualBill) => {
-    const searchText = `${bill.billTitle || ''} ${bill.description || ''}`.toLowerCase();
-    return FOOD_KEYWORDS.some(keyword => searchText.includes(keyword.toLowerCase()));
-  };
-
-  // Parse and filter bills
-  const allBills = individualBillContents ? JSON.parse(individualBillContents) : [];
-  const foodBills = allBills.filter((bill: IndividualBill) => containsFoodKeywords(bill));
-  const displayBills = showFoodOnly ? foodBills : allBills;
-
-  // Filter by search term
-  const filteredBills = displayBills.filter((bill: IndividualBill) => 
-    bill.billTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.measureType.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.introducers.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    bill.currentReferral.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  // Get latest status for each bill
-  const getLatestStatus = (bill: IndividualBill) => {
-    if (bill.statuses && bill.statuses.length > 0) {
-      return bill.statuses[0]; // Assuming statuses are ordered by date
-    }
-    return null;
-  };
+  const { bills, foodBills } = useScrapingContext();
 
   // Export to CSV
   const exportToCSV = () => {
@@ -72,18 +21,15 @@ const BillsSpreadsheet: React.FC = () => {
       'Latest Status Text'
     ].join(',');
 
-    const csvContent = filteredBills.map((bill: IndividualBill) => {
-      const latestStatus = getLatestStatus(bill);
+    const csvContent = bills.map((bill: Bill) => {
       return [
-        `"${bill.billTitle}"`,
-        `"${bill.billTitle}"`,
+        `"${bill.bill_number}"`,
+        `"${bill.bill_title}"`,
+        `"${bill.current_status_string}"`,
         `"${bill.description.replace(/"/g, '""')}"`,
-        `"${bill.measureType.replace(/"/g, '""')}"`,
-        `"${bill.introducers}"`,
-        `"${bill.currentReferral}"`,
-        `"${latestStatus?.date || ''}"`,
-        `"${latestStatus?.chamber || ''}"`,
-        `"${latestStatus?.statustext.replace(/"/g, '""') || ''}"`
+        `"${bill.introducer}"`,
+        `"${bill.committee_assignment}"`,
+        `"FoodRelated ? ${bill.food_related}"`,
       ].join(',');
     }).join('\n');
 
@@ -118,19 +64,6 @@ const BillsSpreadsheet: React.FC = () => {
             />
           </div>
 
-          {/* Food Filter */}
-          <button
-            onClick={() => setShowFoodOnly(!showFoodOnly)}
-            className={`flex items-center px-4 py-2 rounded-md transition-colors ${
-              showFoodOnly 
-                ? 'bg-green-600 text-white' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            <Filter className="w-4 h-4 mr-2" />
-            {showFoodOnly ? 'Food Only' : 'All Bills'}
-          </button>
-
           {/* Export */}
           <button
             onClick={exportToCSV}
@@ -145,11 +78,14 @@ const BillsSpreadsheet: React.FC = () => {
       {/* Stats */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-          <span>Total Bills: <strong>{allBills.length}</strong></span>
-          <span>Food-Related Bills: <strong>{foodBills.length}</strong></span>
-          <span>Currently Showing: <strong>{filteredBills.length}</strong></span>
+          <span>Total Bills: <strong>{bills.length}</strong></span>
+          <span>Food-Related Bills: <strong>{foodBills.length}</strong></span>          
         </div>
       </div>
+
+      <pre>
+        {JSON.stringify(bills, null, 2)}
+      </pre>      
 
       {/* Spreadsheet Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -165,69 +101,54 @@ const BillsSpreadsheet: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Description
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Measure Type
-                </th>
+                </th>                
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Introducers
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Current Referral
+                  Committees
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Latest Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status Date
+                  Last Updated 
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredBills.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
-                    {individualBillContents ? 'No bills match your search criteria.' : 'No bills data available. Run a scraping job first.'}
-                  </td>
-                </tr>
-              ) : (
-                filteredBills.map((bill: IndividualBill, index: number) => {
-                  const latestStatus = getLatestStatus(bill);
-                  return (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {bill.billTitle}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
-                        {bill.billTitle}
-                      </td>
+            {/* <tbody className="bg-white divide-y divide-gray-200">
+              {bills.map((bill: Bill) => {
+                return (
+                  <tr key={bill.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {bill.bill_number}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                      {bill.bill_title}
+                    </td>
                       <td className="px-6 py-4 text-sm text-gray-900 max-w-md">
                         <div className="max-h-20 overflow-y-auto">
                           {bill.description}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
-                        {bill.measureType}
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {bill.introducer}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {bill.introducers}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {bill.currentReferral}
+                        {bill.committee_assignment}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
                         <div className="max-h-20 overflow-y-auto">
-                          {latestStatus?.statustext || 'No status'}
+                          {bill.current_status_string || 'No status'}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {latestStatus?.date || '-'}
+                        {bill.updated_at.toDateString() || '-'}
                       </td>
                     </tr>
                   );
-                })
-              )}
-            </tbody>
+                })}              
+            </tbody> */}
           </table>
         </div>
       </div>
