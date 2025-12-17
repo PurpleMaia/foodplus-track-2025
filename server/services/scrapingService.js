@@ -16,14 +16,39 @@ const userAgents = [
 const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgents.length)];
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const SCRAPING_URL = 'https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2026&report=deadline&active=false&rpt_type=&measuretype=hb&title=2025%20and%202026%20House%20Bills';
-// const SCRAPING_URL ='https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
+
+export async function main() {
+    const currentYear = new Date().getFullYear();
+    console.log(`Starting server job scraping for year ${currentYear}...`);
+    const houseURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced`;
+    const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20Introduced`;
+
+
+    console.log('Scraping House bills...');
+    const startTime = Date.now();
+    
+    await startScraping(houseURL);
+    
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000 / 60; // in minutes
+    console.log(`Finished scraping House bills in ${duration} minutes.`);
+
+    
+    console.log('Scraping Senate bills...');
+    const startTimeSenate = Date.now();
+    
+    await startScraping(senateURL);
+
+    const endTimeSenate = Date.now();
+    const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60; // in minutes
+    console.log(`Finished scraping Senate bills in ${durationSenate} minutes.`);
+}
 
 // Start the scraping process for the Hawaii State Legislature website
-export async function startScraping() {
+export async function startScraping(url) {
   shouldCancelScraping = false;
-  try {
-    const bills = await scrapeBills(SCRAPING_URL);
+  try {    
+    const bills = await scrapeBills(url);
     const individualBillsData = [];
     
     for (const bill of bills) {
@@ -48,6 +73,7 @@ export async function startScraping() {
     throw error;
   }
 }
+
 
 // Cancel the scraping process
 export async function cancelScraping() {

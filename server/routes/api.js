@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { startScraping, saveBills, updateScrapingStats, scrapeIndividual } from '../services/scrapingService.js';
+import { main, saveBills, updateScrapingStats, scrapeIndividual } from '../services/scrapingService.js';
 import { getAllBillsContext } from '../services/bills.js';
 const router = Router();
 
 // GET /api/scrape-bills - Start scraping process
 router.get('/scrape-bills', async (req, res) => {
   try {
-    const result = await startScraping();
+    const result = await main();
     res.json({ 
       bills: result.bills, 
       individualBillsData: result.individualBillsData 
