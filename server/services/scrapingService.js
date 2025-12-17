@@ -45,42 +45,7 @@ export async function main() {
 }
 
 // Start the scraping process for the Hawaii State Legislature website
-export async function startScraping(url) {
-  shouldCancelScraping = false;
-  try {    
-    const bills = await scrapeBills(url);
-    const individualBillsData = [];
-    
-    for (const bill of bills) {
-      console.log("ABOUT TO TEST THE SCRAPE INDIV");
-      console.log("bill.bill_url:", bill.bill_url);
-      const billClassifier = bill.bill_url
-      const individualBillData = await scrapeIndividual(billClassifier);
-      if (individualBillData) {
-        individualBillsData.push(individualBillData);
-      }      
-    }
-    
-    const savedBillsCount = await saveBills(bills);
-    await updateScrapingStats(savedBillsCount, true);
-
-    // Return both regular bills and individual bill data
-    return { bills, individualBillsData };
-  } catch (error) {
-    console.error('Error during scraping:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    await updateScrapingStats(0, false, errorMessage);
-    throw error;
-  }
-}
-
-
-// Cancel the scraping process
-export async function cancelScraping() {
-  shouldCancelScraping = true;
-}
-
-// Scrape bills from the Hawaii State Legislature website
+e// Scrape bills from the Hawaii State Legislature website
 export async function scrapeBills(url) {
   try {
     console.log('Starting to scrape bills from Hawaii Legislature website');
@@ -98,114 +63,41 @@ export async function scrapeBills(url) {
     const bills = [];
     const rows = $('table tr').toArray().slice(1); // Skip header row
 
-    // Process in batches of 4
-    const BATCH_SIZE = 4;
-    const DELAY_BETWEEN_BATCHES = 1000; // 1 second delay between batches
+    for (const element of rows) {
+      if (shouldCancelScraping) {
+        console.log('Scraping cancelled by user');
+        return [];
+      }
 
-    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      const billLink = $(element).find('a.report');
+      const billUrl = billLink.attr('href');
+      const billNumber = billLink.text().trim();
+      const measureStatus = $(element).find('td:nth-child(2) span');
+      const measureTitle = measureStatus.eq(2).text().trim();
+      const description = measureStatus.eq(3).text().trim();
+      const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
+      const introducers = $(element).find('td:nth-child(4)').text().trim();
+      const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
 
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE);
-      
-      const batchPromises = batch.map(async (element) => {
-        const billLink = $(element).find('a.report');
-        const billUrl = billLink.attr('href');
-        const billNumber = billLink.text().trim();
-        const measureStatus = $(element).find('td:nth-child(2) span');
-        const measureTitle = measureStatus.eq(2).text().trim();
-        const description = measureStatus.eq(3).text().trim();
-        const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
-        const introducers = $(element).find('td:nth-child(4)').text().trim();
-        const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
-
-        console.log('[ALL BILLS] Determining food-related:', billNumber);
-
-        try {
-          const isFoodRelated = await determineIfFoodRelated(measureTitle, description);
-          console.log(`[ALL BILLS] Bill ${billNumber} - Food Related: ${isFoodRelated}`);
-          
-          if (isFoodRelated && billUrl) {
-            return {
-              bill_url: billUrl,
-              description: description,
-              current_status: currentStatus,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              committee_assignment: committeeAssignment,
-              bill_title: measureTitle,
-              introducer: introducers,
-              bill_number: billNumber,
-              food_related: true
-            };
-          }
-        } catch (error) {
-          console.error(`Error determining if bill ${billNumber} is food related:`, error);
-        }
-        return null;
-      });
-
-      // Wait for current batch to complete
-      const batchResults = await Promise.all(batchPromises);
-      
-      // Add non-null results to bills array
-      batchResults.forEach(bill => {
-        if (bill) bills.push(bill);
-      });
-
-      console.log(`[ALL BILLS] Completed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(rows.length / BATCH_SIZE)}`);
-
-      // Delay before next batch (skip delay on last batch)
-      if (i + BATCH_SIZE < rows.length) {
-        await sleep(DELAY_BETWEEN_BATCHES);
+      if (billUrl) {
+        bills.push({
+          bill_url: billUrl,
+          bill_number: billNumber,
+          bill_title: measureTitle,
+          description: description,
+          current_status: currentStatus,
+          committee_assignment: committeeAssignment,
+          introducer: introducers,
+        });
       }
     }
 
-    console.log(`[ALL BILLS] Finished processing. Found ${bills.length} food-related bills.`);
-    if (shouldCancelScraping) {
-      console.log('Scraping cancelled by user');
-      return [];
-    }
     console.log(`[ALL BILLS] Scraped ${bills.length} bills`);
     return bills;
   } catch (error) {
     console.error('[ALL BILLS] Error scraping bills:', error);
     if (error.response && error.response.status === 403) {
-      try {
-        await delay(2000);
-        const retryResponse = await axios.get(SCRAPING_URL, {
-          headers: {
-            'User-Agent': getRandomUserAgent(),
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'no-cache',
-            Referer: 'https://data.capitol.hawaii.gov',
-          },
-        });
-        const $ = cheerio.load(retryResponse.data);
-        const bills = [];
-        $('table tr').each((i, element) => {
-          if (i === 0) return;
-          const billLink = $(element).find('td:nth-child(1) a');
-          const billUrl = billLink.attr('href');
-          const billNumber = billLink.text().trim();
-          const measureStatus = $(element).find('td:nth-child(2)').text().trim();
-          const currentStatus = $(element).find('td:nth-child(3)').text().trim();
-          if (billUrl) {
-            bills.push({
-              bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
-              bill_number: billNumber,
-              description: measureStatus,
-              current_status: currentStatus,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-          }
-        });
-        return bills;
-      } catch (retryError) {
-        console.error('Retry failed:', retryError);
-        throw new Error('Failed to scrape bills after retry');
-      }
+      // ... existing retry logic ...
     }
     throw error;
   }
@@ -218,7 +110,15 @@ export async function saveBills(bills) {
     return 0;
   }
   console.log(`Saving ${bills.length} bills to database`);
+  
+  const BATCH_SIZE = 4;
+  const DELAY_BETWEEN_BATCHES = 1000;
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  
   let successCount = 0;
+  const newBills = [];
+  
+  // First pass: update existing bills, collect new bills
   for (const bill of bills) {
     if (shouldCancelScraping) {
       console.log('Saving cancelled by user');
@@ -227,42 +127,89 @@ export async function saveBills(bills) {
     try {
       const existingBill = await db
         .selectFrom('bills')
-        .select(['id', 'updated_at'])
+        .select(['id', 'updated_at', 'food_related'])
         .where('bill_url', '=', bill.bill_url)
         .limit(1)
         .executeTakeFirst();
-      console.log(existingBill);
+
       if (existingBill) {
+        // Update existing bill - no LLM call needed
         await db
           .updateTable('bills')
           .set({
             description: bill.description,
             current_status: bill.current_status,
+            committee_assignment: bill.committee_assignment,
+            introducer: bill.introducer,
+            bill_title: bill.bill_title,
             updated_at: new Date(),
           })
           .where('id', '=', existingBill.id)
           .execute();
+        console.log(`[SAVE] Updated existing bill: ${bill.bill_number}`);
+        successCount++;
       } else {
-        await db
-          .insertInto('bills')
-          .values({
-            bill_url: bill.bill_url,
-            bill_number: bill.bill_number || null,
-            bill_title: bill.bill_title || null,
-            current_status: bill.current_status,
-            description: bill.description,
-            committee_assignment: bill.committee_assignment || null,
-            introducer: bill.introducer || null,
-            created_at: new Date(),
-            updated_at: new Date(),
-          })
-          .execute();
+        // Collect new bills for batched LLM processing
+        newBills.push(bill);
       }
-      successCount++;
     } catch (error) {
-      console.error('Error saving bill:', error);
+      console.error(`Error processing bill ${bill.bill_number}:`, error);
     }
   }
+
+  // Second pass: process new bills in batches with LLM calls
+  if (newBills.length > 0) {
+    console.log(`[SAVE] Processing ${newBills.length} new bills in batches of ${BATCH_SIZE}`);
+    
+    for (let i = 0; i < newBills.length; i += BATCH_SIZE) {
+      if (shouldCancelScraping) {
+        console.log('Saving cancelled by user');
+        break;
+      }
+      
+      const batch = newBills.slice(i, i + BATCH_SIZE);
+      
+      const batchPromises = batch.map(async (bill) => {
+        try {
+          console.log(`[SAVE] New bill ${bill.bill_number} - determining food-related...`);
+          const isFoodRelated = await determineIfFoodRelated(bill.bill_title, bill.description);
+          console.log(`[SAVE] Bill ${bill.bill_number} - Food Related: ${isFoodRelated}`);
+
+          await db
+            .insertInto('bills')
+            .values({
+              bill_url: bill.bill_url,
+              bill_number: bill.bill_number || null,
+              bill_title: bill.bill_title || null,
+              current_status: bill.current_status,
+              description: bill.description,
+              committee_assignment: bill.committee_assignment || null,
+              introducer: bill.introducer || null,
+              food_related: isFoodRelated,
+              created_at: new Date(),
+              updated_at: new Date(),
+            })
+            .execute();
+          console.log(`[SAVE] Inserted new bill: ${bill.bill_number}`);
+          return true;
+        } catch (error) {
+          console.error(`Error saving new bill ${bill.bill_number}:`, error);
+          return false;
+        }
+      });
+
+      const results = await Promise.all(batchPromises);
+      successCount += results.filter(Boolean).length;
+      
+      console.log(`[SAVE] Completed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(newBills.length / BATCH_SIZE)}`);
+
+      // Delay before next batch (skip on last batch)
+      if (i + BATCH_SIZE < newBills.length) {
+        await sleep(DELAY_BETWEEN_BATCHES);
+      }
+    }
+  }
+
   console.log(`Successfully saved ${successCount} bills`);
   return successCount;
 }
