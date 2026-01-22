@@ -1,8 +1,8 @@
 {
     "cron": [
         {
-            "command": "node ./server/services/scrape-bills.js",
-            "schedule": "@daily"
+            "command": "node ./server/scrape-bills.js",
+            "schedule": "@daily"            
         }
     ]
 }
