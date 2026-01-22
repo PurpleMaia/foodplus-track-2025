@@ -20,35 +20,61 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export async function main() {
     const currentYear = new Date().getFullYear();
     console.log(`Starting server job scraping for year ${currentYear}...`);
-    const houseURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced`;
-    const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20Introduced`;
+
+    const houseURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
+    const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
 
 
-    console.log('Scraping House bills...');
+    console.log('[MAIN] Scraping House bills...');
     const startTime = Date.now();
     
     await startScraping(houseURL);
     
     const endTime = Date.now();
     const duration = (endTime - startTime) / 1000 / 60; // in minutes
-    console.log(`Finished scraping House bills in ${duration} minutes.`);
+    console.log(`[MAIN] Finished scraping House bills in ${duration} minutes.`);
 
-    
-    console.log('Scraping Senate bills...');
+    console.log('[MAIN] Scraping Senate bills...');
     const startTimeSenate = Date.now();
-    
+
     await startScraping(senateURL);
 
     const endTimeSenate = Date.now();
     const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60; // in minutes
-    console.log(`Finished scraping Senate bills in ${durationSenate} minutes.`);
+    console.log(`[MAIN] Finished scraping Senate bills in ${durationSenate} minutes.`);
 }
 
 // Start the scraping process for the Hawaii State Legislature website
+async function startScraping(url) {
+  try {
+    const bills = await scrapeBills(url);
+    const individualBillsData = [];
+    
+    // return bill ids
+    const billIds = await saveBills(bills);
+    await updateScrapingStats(billIds.length, true);
+
+    for (const id of billIds) {
+      const individualBillData = await scrapeIndividual(id);
+      if (individualBillData) {
+        individualBillsData.push(individualBillData);
+      }      
+    }
+
+    // Return both regular bills and individual bill data
+    return { bills, individualBillsData };
+  } catch (error) {
+    console.error('Error during scraping:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    await updateScrapingStats(0, false, errorMessage);
+    throw error;
+  }
+}
+
 // Scrape bills from the Hawaii State Legislature website
 export async function scrapeBills(url) {
   try {
-    console.log('Starting to scrape bills from Hawaii Legislature website');
+    console.log('Scraping bills from a main bill list...');
     await delay(1000);
     const response = await axios.get(url, {
       headers: {
@@ -72,6 +98,7 @@ export async function scrapeBills(url) {
       const billLink = $(element).find('a.report');
       const billUrl = billLink.attr('href');
       const billNumber = billLink.text().trim();
+      const billYear = new URL(billUrl, 'https://data.capitol.hawaii.gov').searchParams.get('year');
       const measureStatus = $(element).find('td:nth-child(2) span');
       const measureTitle = measureStatus.eq(2).text().trim();
       const description = measureStatus.eq(3).text().trim();
@@ -83,9 +110,10 @@ export async function scrapeBills(url) {
         bills.push({
           bill_url: billUrl,
           bill_number: billNumber,
+          year: billYear,
           bill_title: measureTitle,
           description: description,
-          current_status: currentStatus,
+          current_status_string: currentStatus,
           committee_assignment: committeeAssignment,
           introducer: introducers,
         });
@@ -109,26 +137,29 @@ export async function saveBills(bills) {
     console.log('No bills to save');
     return 0;
   }
-  console.log(`Saving ${bills.length} bills to database`);
+  console.log(`[SAVE] Saving ${bills.length} bills to database...`);
   
   const BATCH_SIZE = 4;
   const DELAY_BETWEEN_BATCHES = 1000;
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-  
-  let successCount = 0;
+
+  let billIds = [];
   const newBills = [];
   
   // First pass: update existing bills, collect new bills
+  console.log('[SAVE] First pass: updating existing bills...');
   for (const bill of bills) {
     if (shouldCancelScraping) {
       console.log('Saving cancelled by user');
       break;
     }
     try {
+      // Find existing bill by bill_number and bill_year constraint
       const existingBill = await db
         .selectFrom('bills')
         .select(['id', 'updated_at', 'food_related'])
-        .where('bill_url', '=', bill.bill_url)
+        .where('bill_number', '=', bill.bill_number)
+        .where('year', '=', bill.year)
         .limit(1)
         .executeTakeFirst();
 
@@ -147,7 +178,6 @@ export async function saveBills(bills) {
           .where('id', '=', existingBill.id)
           .execute();
         console.log(`[SAVE] Updated existing bill: ${bill.bill_number}`);
-        successCount++;
       } else {
         // Collect new bills for batched LLM processing
         newBills.push(bill);
@@ -158,6 +188,7 @@ export async function saveBills(bills) {
   }
 
   // Second pass: process new bills in batches with LLM calls
+  console.log('[SAVE] Second pass: classifying new bills with LLM calls...');
   if (newBills.length > 0) {
     console.log(`[SAVE] Processing ${newBills.length} new bills in batches of ${BATCH_SIZE}`);
     
@@ -175,13 +206,14 @@ export async function saveBills(bills) {
           const isFoodRelated = await determineIfFoodRelated(bill.bill_title, bill.description);
           console.log(`[SAVE] Bill ${bill.bill_number} - Food Related: ${isFoodRelated}`);
 
-          await db
+          const newBill = await db
             .insertInto('bills')
             .values({
               bill_url: bill.bill_url,
+              year: bill.year || null,
               bill_number: bill.bill_number || null,
               bill_title: bill.bill_title || null,
-              current_status: bill.current_status,
+              current_status_string: bill.current_status_string || null,
               description: bill.description,
               committee_assignment: bill.committee_assignment || null,
               introducer: bill.introducer || null,
@@ -189,18 +221,23 @@ export async function saveBills(bills) {
               created_at: new Date(),
               updated_at: new Date(),
             })
-            .execute();
+            .returning('id')
+            .executeTakeFirst();
+            
           console.log(`[SAVE] Inserted new bill: ${bill.bill_number}`);
-          return true;
+
+          // Log the new bill ID for scrapeIndividual use
+          return newBill.id;
         } catch (error) {
           console.error(`Error saving new bill ${bill.bill_number}:`, error);
-          return false;
+          return null;
         }
       });
 
+      // Append the bill IDs from this batch
       const results = await Promise.all(batchPromises);
-      successCount += results.filter(Boolean).length;
-      
+      billIds.push(...results.filter(id => id !== null));
+
       console.log(`[SAVE] Completed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(newBills.length / BATCH_SIZE)}`);
 
       // Delay before next batch (skip on last batch)
@@ -210,8 +247,7 @@ export async function saveBills(bills) {
     }
   }
 
-  console.log(`Successfully saved ${successCount} bills`);
-  return successCount;
+  return billIds;
 }
 
 // Update scraping statistics
@@ -241,7 +277,8 @@ export async function scrapeIndividual(billClassifier) {
 
   let newBill = false
   let url, billID
-  if (billClassifier.startsWith('https://')) {
+  const urlPattern = /^https?:\/\//i;
+  if (urlPattern.test(billClassifier)) {
     // bill url was passed
     console.log('[INDIVIDUAL] using bill URL...')
 
@@ -289,7 +326,7 @@ export async function scrapeIndividual(billClassifier) {
   const updatedUrl = url.replace("www.", "data.");
   try {
     // ==== test-scrape.js ====
-     console.log('[INDIVIDUAL] Starting to test scrape the individual page')
+     console.log('[INDIVIDUAL] Scraping individual page...')
      await delay(1000)
 
     const response = await axios.get(updatedUrl, {
@@ -376,14 +413,14 @@ export async function scrapeIndividual(billClassifier) {
 
 export async function saveUpdates(updates) {
   if (!updates || updates.length === 0) {
-    console.log('[updates] No bills to save');
+    console.log('[SAVE UPDATES] No bills to save');
     return 0;
   }
-  console.log(`[updates] Attempting to save ${updates.length} updates to database`);
+  console.log(`[SAVE UPDATES] Saving ${updates.length} updates to database...`);
   let successCount = 0;
   for (const update of updates) {
     if (shouldCancelScraping) {
-      console.log('[updates] Saving cancelled by user');
+      console.log('[SAVE UPDATES] Saving cancelled by user');
       break;
     }
     try {
@@ -397,9 +434,7 @@ export async function saveUpdates(updates) {
         .limit(1)
         .executeTakeFirst();
       // console.log('existingUpdate:', existingUpdate);
-      if (existingUpdate) {
-        console.log('[updates] found the same update (', existingUpdate.id, ') skipping insertion...')
-      } else {
+      if (!existingUpdate) {        
         console.log('[updates] NEW UPDATE! inserting into db...')
         await db
           .insertInto('status_updates')
@@ -410,7 +445,6 @@ export async function saveUpdates(updates) {
     } catch (error) {
       console.error('Error saving update:', error);
     }
-  }
-  console.log(`[updates] Successfully saved ${successCount} updates`);
+  }  
   return successCount;
 }
