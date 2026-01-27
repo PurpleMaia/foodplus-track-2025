@@ -1,31 +1,4 @@
-import { scrapeBills } from '../server/services/scrapingService.js';
-
-// LOCAL DEFINITION FOR CRON JOB (same as in scrapingService.js)
-async function startScraping(url) {
-  try {
-    const bills = await scrapeBills(url);
-    const individualBillsData = [];
-    
-    for (const bill of bills) {
-      const billClassifier = bill.bill_url
-      const individualBillData = await scrapeIndividual(billClassifier);
-      if (individualBillData) {
-        individualBillsData.push(individualBillData);
-      }      
-    }
-    
-    const savedBillsCount = await saveBills(bills);
-    await updateScrapingStats(savedBillsCount, true);
-
-    // Return both regular bills and individual bill data
-    return { bills, individualBillsData };
-  } catch (error) {
-    console.error('Error during scraping:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    await updateScrapingStats(0, false, errorMessage);
-    throw error;
-  }
-}
+import { startScraping } from './services/scrapingService.js';
 
 async function main() {
     const currentYear = new Date().getFullYear();

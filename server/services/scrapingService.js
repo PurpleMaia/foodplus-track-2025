@@ -45,7 +45,7 @@ export async function main() {
 }
 
 // Start the scraping process for the Hawaii State Legislature website
-async function startScraping(url) {
+export async function startScraping(url) {
   try {
     const bills = await scrapeBills(url);
     const individualBillsData = [];
