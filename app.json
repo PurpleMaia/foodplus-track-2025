@@ -2,7 +2,7 @@
     "cron": [
         {
             "command": "node ./server/scrape-bills.js",
-            "schedule": "@daily"            
+            "schedule": "@hourly"            
         }
     ]
 }
