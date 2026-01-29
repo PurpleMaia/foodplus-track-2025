@@ -287,7 +287,7 @@ export async function scrapeIndividual(billClassifier) {
     const result = await db
       .selectFrom('bills')
       .select('id')
-      .where('bill_url', 'ilike', `${billClassifier}%`)
+      .where('bill_url', '=', billClassifier)
       .executeTakeFirst();
 
     // if no result, the bill url is new and not in db yet
@@ -341,7 +341,7 @@ export async function scrapeIndividual(billClassifier) {
     });
     // =========================    
 
-    const $ = cheerio.load(response.data)    
+    const $ = cheerio.load(response.data)
 
     // 5. Extract introducers
     const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
@@ -371,7 +371,6 @@ export async function scrapeIndividual(billClassifier) {
     }
 
     const updates = []
-    let currentStatusString
     $('#MainContent_GridViewStatus tr').each((i, row) => {
       // console.log('Number of status rows:', $('#MainContent_GridViewStatus tr').length);
 
@@ -380,13 +379,6 @@ export async function scrapeIndividual(billClassifier) {
         const date = $(tds[0]).text().trim();
         const chamber = $(tds[1]).text().trim();
         const statusText = $(tds[2]).text().trim();
-
-        if (!found) {
-          if (i == 1) {
-            currentStatusString = chamber + ' ' + date + ': ' + statusText
-            console.log('currentStatusString: ', currentStatusString)     
-          }   
-        } 
 
         // building row in status_updates
         updates.push({
