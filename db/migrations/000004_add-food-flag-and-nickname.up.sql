@@ -1,5 +1,0 @@
-ALTER TABLE bills
-    ADD COLUMN IF NOT EXISTS nickname TEXT;
-
-ALTER TABLE bills
-    ADD COLUMN IF NOT EXISTS food_related BOOLEAN DEFAULT false;

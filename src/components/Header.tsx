@@ -27,31 +27,7 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             >
               <BarChart2 className="w-5 h-5 mr-2" />
               Dashboard
-            </button>
-            
-            <button
-              onClick={() => setActiveTab('bills')}
-              className={`flex items-center px-4 py-2 rounded-md transition-all ${
-                activeTab === 'bills'
-                  ? 'bg-amber-500 text-white'
-                  : 'text-white/80 hover:bg-blue-700'
-              }`}
-            >
-              <FileText className="w-5 h-5 mr-2" />
-              Bills
-            </button>
-            
-            <button
-              onClick={() => setActiveTab('spreadsheet')}
-              className={`flex items-center px-4 py-2 rounded-md transition-all ${
-                activeTab === 'spreadsheet'
-                  ? 'bg-amber-500 text-white'
-                  : 'text-white/80 hover:bg-blue-700'
-              }`}
-            >
-              <Table className="w-5 h-5 mr-2" />
-              Spreadsheet
-            </button>
+            </button>        
 
             <button
               onClick={() => setActiveTab('controls')}

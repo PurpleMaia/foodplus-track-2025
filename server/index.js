@@ -3,7 +3,6 @@ dotenv.config();
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import scrapeBillsRouter from './scrape-bills.js';
 import apiRouter from './routes/api.js';
 
 const app = express();
@@ -29,7 +28,7 @@ app.use((req, res, next) => {
 app.use('/api', apiRouter);
 
 // Legacy route (keep for backward compatibility)
-app.use('/scrape-bills', scrapeBillsRouter);
+// app.use('/scrape-bills', scrapeBillsRouter);
 
 // Serve static files
 app.use(express.static(distPath));

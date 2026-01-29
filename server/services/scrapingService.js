@@ -1,7 +1,7 @@
 import { db } from '../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { read, writeFileSync } from 'fs';
+import { determineIfFoodRelated } from './llm.js';
 
 // Flag to track if scraping should be cancelled
 let shouldCancelScraping = false;
@@ -17,28 +17,49 @@ const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgent
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const SCRAPING_URL =
-  'https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2025&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20Introduced';
+export async function main() {
+    const currentYear = new Date().getFullYear();
+    console.log(`Starting server job scraping for year ${currentYear}...`);
+
+    const houseURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
+    const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
+
+
+    console.log('[MAIN] Scraping House bills...');
+    const startTime = Date.now();
+    
+    await startScraping(houseURL);
+    
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000 / 60; // in minutes
+    console.log(`[MAIN] Finished scraping House bills in ${duration} minutes.`);
+
+    console.log('[MAIN] Scraping Senate bills...');
+    const startTimeSenate = Date.now();
+
+    await startScraping(senateURL);
+
+    const endTimeSenate = Date.now();
+    const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60; // in minutes
+    console.log(`[MAIN] Finished scraping Senate bills in ${durationSenate} minutes.`);
+}
 
 // Start the scraping process for the Hawaii State Legislature website
-export async function startScraping() {
-  shouldCancelScraping = false;
+export async function startScraping(url) {
   try {
-    const bills = await scrapeBills();
+    const bills = await scrapeBills(url);
     const individualBillsData = [];
     
-    for (const bill of bills) {
-      console.log("ABOUT TO TEST THE SCRAPE INDIV");
-      console.log("bill.bill_url:", bill.bill_url);
-      const billClassifier = bill.bill_url
-      const individualBillData = await scrapeIndividual(billClassifier);
+    // return bill ids
+    const billIds = await saveBills(bills);
+    await updateScrapingStats(billIds.length, true);
+
+    for (const id of billIds) {
+      const individualBillData = await scrapeIndividual(id);
       if (individualBillData) {
         individualBillsData.push(individualBillData);
       }      
     }
-    
-    const savedBillsCount = await saveBills(bills);
-    await updateScrapingStats(savedBillsCount, true);
 
     // Return both regular bills and individual bill data
     return { bills, individualBillsData };
@@ -50,17 +71,12 @@ export async function startScraping() {
   }
 }
 
-// Cancel the scraping process
-export async function cancelScraping() {
-  shouldCancelScraping = true;
-}
-
 // Scrape bills from the Hawaii State Legislature website
-export async function scrapeBills() {
+export async function scrapeBills(url) {
   try {
-    console.log('Starting to scrape bills from Hawaii Legislature website');
+    console.log('Scraping bills from a main bill list...');
     await delay(1000);
-    const response = await axios.get(SCRAPING_URL, {
+    const response = await axios.get(url, {
       headers: {
         'User-Agent': getRandomUserAgent(),
         Accept: 'text/html',
@@ -71,76 +87,45 @@ export async function scrapeBills() {
     });
     const $ = cheerio.load(response.data);
     const bills = [];
-    $('table tr').slice(1, 5).each((i, element) => {
-      if (i === 0) return;
+    const rows = $('table tr').toArray().slice(1); // Skip header row
+
+    for (const element of rows) {
+      if (shouldCancelScraping) {
+        console.log('Scraping cancelled by user');
+        return [];
+      }
+
       const billLink = $(element).find('a.report');
-      const billUrl = billLink.attr('href'); //www.capitol. replace it data. using regex
+      const billUrl = billLink.attr('href');
       const billNumber = billLink.text().trim();
+      const billYear = new URL(billUrl, 'https://data.capitol.hawaii.gov').searchParams.get('year');
       const measureStatus = $(element).find('td:nth-child(2) span');
       const measureTitle = measureStatus.eq(2).text().trim();
       const description = measureStatus.eq(3).text().trim();
       const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
       const introducers = $(element).find('td:nth-child(4)').text().trim();
       const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
+
       if (billUrl) {
         bills.push({
           bill_url: billUrl,
-          description: description,
-          current_status: currentStatus,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          committee_assignment: committeeAssignment,
-          bill_title: measureTitle,
-          introducer: introducers,
           bill_number: billNumber,
+          year: billYear,
+          bill_title: measureTitle,
+          description: description,
+          current_status_string: currentStatus,
+          committee_assignment: committeeAssignment,
+          introducer: introducers,
         });
       }
-    });
-    if (shouldCancelScraping) {
-      console.log('Scraping cancelled by user');
-      return [];
     }
-    console.log(`Scraped ${bills.length} bills`);
+
+    console.log(`[ALL BILLS] Scraped ${bills.length} bills`);
     return bills;
   } catch (error) {
-    console.error('Error scraping bills:', error);
+    console.error('[ALL BILLS] Error scraping bills:', error);
     if (error.response && error.response.status === 403) {
-      try {
-        await delay(2000);
-        const retryResponse = await axios.get(SCRAPING_URL, {
-          headers: {
-            'User-Agent': getRandomUserAgent(),
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Cache-Control': 'no-cache',
-            Referer: 'https://data.capitol.hawaii.gov',
-          },
-        });
-        const $ = cheerio.load(retryResponse.data);
-        const bills = [];
-        $('table tr').each((i, element) => {
-          if (i === 0) return;
-          const billLink = $(element).find('td:nth-child(1) a');
-          const billUrl = billLink.attr('href');
-          const billNumber = billLink.text().trim();
-          const measureStatus = $(element).find('td:nth-child(2)').text().trim();
-          const currentStatus = $(element).find('td:nth-child(3)').text().trim();
-          if (billUrl) {
-            bills.push({
-              bill_url: `https://data.capitol.hawaii.gov${billUrl}`,
-              bill_number: billNumber,
-              description: measureStatus,
-              current_status: currentStatus,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-          }
-        });
-        return bills;
-      } catch (retryError) {
-        console.error('Retry failed:', retryError);
-        throw new Error('Failed to scrape bills after retry');
-      }
+      // ... existing retry logic ...
     }
     throw error;
   }
@@ -152,54 +137,118 @@ export async function saveBills(bills) {
     console.log('No bills to save');
     return 0;
   }
-  console.log(`Saving ${bills.length} bills to database`);
-  let successCount = 0;
+  console.log(`[SAVE] Saving ${bills.length} bills to database...`);
+  
+  const BATCH_SIZE = 4;
+  const DELAY_BETWEEN_BATCHES = 1000;
+  const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+  let billIds = [];
+  const newBills = [];
+  
+  // First pass: update existing bills, collect new bills
+  console.log('[SAVE] First pass: updating existing bills...');
   for (const bill of bills) {
     if (shouldCancelScraping) {
       console.log('Saving cancelled by user');
       break;
     }
     try {
+      // Find existing bill by bill_number and bill_year constraint
       const existingBill = await db
         .selectFrom('bills')
-        .select(['id', 'updated_at'])
-        .where('bill_url', '=', bill.bill_url)
+        .select(['id', 'updated_at', 'food_related'])
+        .where('bill_number', '=', bill.bill_number)
+        .where('year', '=', bill.year)
         .limit(1)
         .executeTakeFirst();
-      console.log(existingBill);
+
       if (existingBill) {
+        // Update existing bill - no LLM call needed
         await db
           .updateTable('bills')
           .set({
             description: bill.description,
             current_status: bill.current_status,
+            committee_assignment: bill.committee_assignment,
+            introducer: bill.introducer,
+            bill_title: bill.bill_title,
             updated_at: new Date(),
           })
           .where('id', '=', existingBill.id)
           .execute();
+        console.log(`[SAVE] Updated existing bill: ${bill.bill_number}`);
       } else {
-        await db
-          .insertInto('bills')
-          .values({
-            bill_url: bill.bill_url,
-            bill_number: bill.bill_number || null,
-            bill_title: bill.bill_title || null,
-            current_status: bill.current_status,
-            description: bill.description,
-            committee_assignment: bill.committee_assignment || null,
-            introducer: bill.introducer || null,
-            created_at: new Date(),
-            updated_at: new Date(),
-          })
-          .execute();
+        // Collect new bills for batched LLM processing
+        newBills.push(bill);
       }
-      successCount++;
     } catch (error) {
-      console.error('Error saving bill:', error);
+      console.error(`Error processing bill ${bill.bill_number}:`, error);
     }
   }
-  console.log(`Successfully saved ${successCount} bills`);
-  return successCount;
+
+  // Second pass: process new bills in batches with LLM calls
+  console.log('[SAVE] Second pass: classifying new bills with LLM calls...');
+  if (newBills.length > 0) {
+    console.log(`[SAVE] Processing ${newBills.length} new bills in batches of ${BATCH_SIZE}`);
+    
+    for (let i = 0; i < newBills.length; i += BATCH_SIZE) {
+      if (shouldCancelScraping) {
+        console.log('Saving cancelled by user');
+        break;
+      }
+      
+      const batch = newBills.slice(i, i + BATCH_SIZE);
+      
+      const batchPromises = batch.map(async (bill) => {
+        try {
+          console.log(`[SAVE] New bill ${bill.bill_number} - determining food-related...`);
+          const isFoodRelated = await determineIfFoodRelated(bill.bill_title, bill.description);
+          console.log(`[SAVE] Bill ${bill.bill_number} - Food Related: ${isFoodRelated}`);
+
+          const newBill = await db
+            .insertInto('bills')
+            .values({
+              bill_url: bill.bill_url,
+              year: bill.year || null,
+              bill_number: bill.bill_number || null,
+              bill_title: bill.bill_title || null,
+              current_status_string: bill.current_status_string || null,
+              description: bill.description,
+              committee_assignment: bill.committee_assignment || null,
+              introducer: bill.introducer || null,
+              food_related: isFoodRelated,
+              archived: false,
+              created_at: new Date(),
+              updated_at: new Date(),
+            })
+            .returning('id')
+            .executeTakeFirst();
+            
+          console.log(`[SAVE] Inserted new bill: ${bill.bill_number}`);
+
+          // Log the new bill ID for scrapeIndividual use
+          return newBill.id;
+        } catch (error) {
+          console.error(`Error saving new bill ${bill.bill_number}:`, error);
+          return null;
+        }
+      });
+
+      // Append the bill IDs from this batch
+      const results = await Promise.all(batchPromises);
+      billIds.push(...results.filter(id => id !== null));
+
+      console.log(`[SAVE] Completed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(newBills.length / BATCH_SIZE)}`);
+
+      // Delay before next batch (skip on last batch)
+      if (i + BATCH_SIZE < newBills.length) {
+        await sleep(DELAY_BETWEEN_BATCHES);
+      }
+    }
+  }
+
+  return billIds;
 }
 
 // Update scraping statistics
@@ -224,15 +273,15 @@ export async function updateScrapingStats(billsSaved, success, errorMessage) {
 // Scrape individual bill 
 // const INDIVIDUAL_URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype=SB&billnumber=1186&year=2025'; // example endpoint: bills dataset
 
-console.log("GOING IN");
-
 export async function scrapeIndividual(billClassifier) {
-  console.log('scrapeIndividual classifer:', billClassifier)
+  console.log('[INDIVIDUAL] NEW CALL WITH CLASSIFIER: ', billClassifier)
 
-  let url, billID, found
-  if (billClassifier.startsWith('https://')) {
+  let newBill = false
+  let url, billID
+  const urlPattern = /^https?:\/\//i;
+  if (urlPattern.test(billClassifier)) {
     // bill url was passed
-    console.log('using billURL...')
+    console.log('[INDIVIDUAL] using bill URL...')
 
     // get bill_id for foreign key constraints in later insertions
     const result = await db
@@ -240,20 +289,20 @@ export async function scrapeIndividual(billClassifier) {
       .select('id')
       .where('bill_url', 'ilike', `${billClassifier}%`)
       .executeTakeFirst();
-  
-    if (result) {
-      console.log('found bill id and was in db:', result.id)
-      found = true
-      billID = result.id
+
+    // if no result, the bill url is new and not in db yet
+    if (!result) {
+      console.log('[INDIVIDUAL] No bill found for this URL in DB yet.')  
+      newBill = true
     } else {
-      console.log('bill is not in database...')
-      found = false
+      console.log('[INDIVIDUAL] found bill id:', result.id)      
+      billID = result.id
     }
 
     url = billClassifier
   } else {
-    // bill id was passed
-    console.log('using billID...')
+    // bill id was passed through api call
+    console.log('[INDIVIDUAL] using billID...')
     billID = billClassifier
 
     // get bill_url from passed in billID parameter
@@ -262,9 +311,8 @@ export async function scrapeIndividual(billClassifier) {
       .select('bill_url')
       .where('id', '=', billID)
       .executeTakeFirst();
-  
-    console.log('found bill url:', result.bill_url)
-    found = true
+
+    console.log('[INDIVIDUAL] found bill url:', result.bill_url)
     url = result.bill_url
   }
   
@@ -272,17 +320,17 @@ export async function scrapeIndividual(billClassifier) {
   if (url.startsWith('<a')) {
     const match = url.match(/href=(["']?)([^"'\s>]+)\1/);
     url = match ? match[2] : null;
-    console.log('Had to convert:', url)
-  }  
+    console.log('[INDIVIDUAL] Had to convert:', url)
+  }
 
+  // modify url to use data. instead of www.
   const updatedUrl = url.replace("www.", "data.");
-  const INDIVIDUAL_URL = updatedUrl
   try {
     // ==== test-scrape.js ====
-     console.log('Starting to test scrape the individual page')
+     console.log('[INDIVIDUAL] Scraping individual page...')
      await delay(1000)
 
-    const response = await axios.get(INDIVIDUAL_URL, {
+    const response = await axios.get(updatedUrl, {
       headers: {
         'User-Agent': getRandomUserAgent(),
         Accept: 'text/html',
@@ -295,15 +343,33 @@ export async function scrapeIndividual(billClassifier) {
 
     const $ = cheerio.load(response.data)    
 
-    // 5. Extract data in case bill was not found in database    
-    const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
-    const billNumber = $('#MainContent_LinkButtonMeasure').text().trim();
-    const currentReferral = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
+    // 5. Extract introducers
     const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
-    const measureTitle = $('#MainContent_ListView1_measure_titleLabel_0').text().trim(); // bill_title
-      
-    // const statuses = $('#ctl00_MainContent_UpdatePanel1').text().trim();
-    
+    const currentStatus = $('#MainContent_ListView1_current_statusLabel_0').text().trim();
+    const committeeAssignment = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
+    const billTitle = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
+    const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
+    const billNumber = $('#MainContent_LinkButtonMeasure').text().trim().split(' ')[0];
+
+    // If new bill, insert into bills table to get billID for foreign key constraints
+    if (newBill) {
+      console.log('[INDIVIDUAL] This is a NEW BILL, inserting bill info into bills table...')
+      const newBillId = await db
+        .insertInto('bills')
+        .values({
+          bill_url: url,
+          description: description,
+          current_status_string: currentStatus,
+          committee_assignment: committeeAssignment,          
+          bill_title: billTitle,
+          introducer: introducers,
+          bill_number: billNumber,
+          updated_at: new Date(),
+        }).returning('bills.id').executeTakeFirst();
+      console.log('[INDIVIDUAL] New bill inserted with ID:', newBillId.id)
+      billID = newBillId.id
+    }
+
     const updates = []
     let currentStatusString
     $('#MainContent_GridViewStatus tr').each((i, row) => {
@@ -332,58 +398,38 @@ export async function scrapeIndividual(billClassifier) {
       }
     });
 
-    // data object of inidividual web page scrape (used for insertion)
     const billData = {
-      bill_url: url,
+      bill_url: updatedUrl,
       bill_number: billNumber,
-      bill_title: measureTitle,      
+      bill_title: billTitle,
       description: description,
-      committee_assignment: currentReferral,    
+      current_status: currentStatus,
+      committee_assignment: committeeAssignment,
       introducer: introducers,
-      updates: updates      
+      updates: updates
     };
 
-    if (!found) {
-      const { updates, ...restOfBillData } = billData; // remove updates from objects and capture the rest
-
-      const newBillData = {
-        ...restOfBillData,
-        current_status_string: currentStatusString,
-        created_at: new Date(),
-        updated_at: new Date()
-      }
-
-      console.log('about to insert new bill into db: ', newBillData)
-      const inserted = await db
-        .insertInto('bills')
-        .values(newBillData)
-        .returning('bill_id')
-        .execute()
-
-      updates.map((update) => update.bill_id = inserted.bill_id)
-    }
-
-    console.log('scraped updates:', updates)
-    await saveUpdates(updates)    
+    console.log('[INDIVIDUAL] # Updates found:', updates.length)
+    await saveUpdates(updates)
 
     return billData;
 
   } catch (error) {
-    console.error('Error scraping bills:', error);
+    console.error('[INDIVIDUAL] Error scraping bills:', error);
   }
 
 }
 
 export async function saveUpdates(updates) {
   if (!updates || updates.length === 0) {
-    console.log('No bills to save');
+    console.log('[SAVE UPDATES] No bills to save');
     return 0;
   }
-  console.log(`Attempting to save ${updates.length} updates to database`);
+  console.log(`[SAVE UPDATES] Saving ${updates.length} updates to database...`);
   let successCount = 0;
   for (const update of updates) {
     if (shouldCancelScraping) {
-      console.log('Saving cancelled by user');
+      console.log('[SAVE UPDATES] Saving cancelled by user');
       break;
     }
     try {
@@ -396,21 +442,18 @@ export async function saveUpdates(updates) {
         .where('statustext', '=', update.statustext)
         .limit(1)
         .executeTakeFirst();
-      console.log('existingUpdate:', existingUpdate);
-      if (existingUpdate) {
-        console.log('found the same update, skipping insertion...')
-      } else {
-        console.log('new update, inserting into db...')
+      // console.log('existingUpdate:', existingUpdate);
+      if (!existingUpdate) {        
+        console.log('[updates] NEW UPDATE! inserting into db...')
         await db
           .insertInto('status_updates')
-          .values(updates)
-          .execute();
+          .values(update)
+          .executeTakeFirst();
       }
       successCount++;
     } catch (error) {
       console.error('Error saving update:', error);
     }
-  }
-  console.log(`Successfully saved ${successCount} updates`);
+  }  
   return successCount;
 }

@@ -13,17 +13,48 @@ export type Int8 = ColumnType<string, bigint | number | string, bigint | number 
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
+export interface AuthKey {
+  created_at: Generated<Timestamp | null>;
+  google_refresh_token: string | null;
+  hashed_password: string | null;
+  id: Generated<string>;
+  user_id: string | null;
+}
+
 export interface Bills {
   bill_number: string | null;
   bill_title: string | null;
   bill_url: string;
   committee_assignment: string | null;
   created_at: Generated<Timestamp | null>;
-  current_status: string;
+  current_status: Generated<string | null>;
+  current_status_string: string;
   description: string;
+  food_related: Generated<boolean | null>;
   id: Generated<string>;
   introducer: string | null;
+  nickname: string | null;
   updated_at: Generated<Timestamp | null>;
+}
+
+export interface BillTags {
+  bill_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  tag_id: string;
+}
+
+export interface PendingProposals {
+  approval_status: Generated<string | null>;
+  approved_at: Timestamp | null;
+  approved_by_user_id: string | null;
+  bill_id: string;
+  current_status: string;
+  id: Generated<string>;
+  note: string | null;
+  proposed_at: Generated<Timestamp>;
+  proposed_by_user_id: string;
+  proposed_status: string;
 }
 
 export interface SchemaMigrations {
@@ -40,6 +71,14 @@ export interface ScrapingStats {
   success: Generated<boolean | null>;
 }
 
+export interface Sessions {
+  created_at: Generated<Timestamp | null>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  session_token: string;
+  user_id: string | null;
+}
+
 export interface StatusUpdates {
   bill_id: string;
   chamber: string;
@@ -48,9 +87,65 @@ export interface StatusUpdates {
   statustext: string;
 }
 
+export interface SupervisorUsers {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  supervisor_id: string;
+  user_id: string;
+}
+
+export interface Tags {
+  color: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  name: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface User {
+  account_status: string;
+  auth_provider: Generated<string | null>;
+  created_at: Generated<Timestamp | null>;
+  email: string;
+  email_verified: Generated<boolean | null>;
+  google_id: string | null;
+  id: Generated<string>;
+  profile_picture_url: string | null;
+  requested_admin: Generated<boolean>;
+  requested_supervisor: Generated<boolean | null>;
+  role: Generated<string>;
+  username: string;
+  verification_token: string | null;
+}
+
+export interface UserBillPreferences {
+  bill_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  nickname: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface UserBills {
+  adopted_at: Generated<Timestamp | null>;
+  bill_id: string | null;
+  id: Generated<string>;
+  user_id: string | null;
+}
+
 export interface DB {
+  auth_key: AuthKey;
+  bill_tags: BillTags;
   bills: Bills;
+  pending_proposals: PendingProposals;
   schema_migrations: SchemaMigrations;
   scraping_stats: ScrapingStats;
+  sessions: Sessions;
   status_updates: StatusUpdates;
+  supervisor_users: SupervisorUsers;
+  tags: Tags;
+  user: User;
+  user_bill_preferences: UserBillPreferences;
+  user_bills: UserBills;
 }

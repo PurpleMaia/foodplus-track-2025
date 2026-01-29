@@ -1,20 +1,20 @@
 // get data from the supabase and call service api
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '../lib/supabaseClient';
-import { startScraping, cancelScraping, scrapeIndividual } from '../lib/scrapingClient';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { startScraping } from '../services/scraper.ts';
 import toast from 'react-hot-toast';
 import { Bill, ScrapingStatus } from '../types';
+import { fetchBillsContext } from '../services/bill.ts';
 
 interface ScrapingContextType {
-  bills: Bill[];
+  bills: Bill[];  
+  foodBills: Bill[];
   isLoading: boolean;
   error: string | null;
   scrapingStatus: ScrapingStatus;
   refreshBills: () => Promise<void>;
   startScrapingJob: () => Promise<void>;
-  stopScrapingJob: () => Promise<void>;
-  startScrapingIndividualJob: () => Promise<void>;
   totalBills: number;
+  totalFoodBills: number;
   lastScraped: Date | null;
   individualBillContents: string;
 }
@@ -23,10 +23,12 @@ const ScrapingContext = createContext<ScrapingContextType | undefined>(undefined
 
 export const ScrapingProvider = ({ children }: { children: ReactNode }) => {
   const [bills, setBills] = useState<Bill[]>([]);
+  const [foodBills, setFoodBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [scrapingStatus, setScrapingStatus] = useState<ScrapingStatus>('idle');
   const [totalBills, setTotalBills] = useState(0);
+  const [totalFoodBills, setTotalFoodBills] = useState(0);
   const [lastScraped, setLastScraped] = useState<Date | null>(null);
   const [individualBillContents, setIndividualBillContents] = useState<string>('');
 
@@ -35,35 +37,16 @@ export const ScrapingProvider = ({ children }: { children: ReactNode }) => {
     setError(null);
     
     try {
-      // TODO make this all api calls instead of serverless supabase calls
-      // Get bills count 
-      const { count } = await supabase
-        .from('bills')
-        .select('*', { count: 'exact', head: true });
-      
-      setTotalBills(count || 0);
-      
-      // Get most recent bills
-      const { data, error } = await supabase
-        .from('bills')
-        .select('*')
-        .order('updated_at', { ascending: false })
-        .limit(100);
-        
+      // Fetch all bills and food-related bills in parallel
+      const { allBills, foodBills, lastScrapeTime } = await fetchBillsContext();      
+      setBills(allBills);
+      setTotalBills(allBills.length);
+      setFoodBills(foodBills);
+      setTotalFoodBills(foodBills.length);
+      setLastScraped(lastScrapeTime ? new Date(lastScrapeTime) : null);
+
       if (error) throw error;
       
-      setBills(data as Bill[]);
-      
-      // Get last scraped time
-      const { data: statsData } = await supabase
-        .from('scraping_stats')
-        .select('last_scrape_time')
-        .order('last_scrape_time', { ascending: false })
-        .limit(1);
-        
-      if (statsData && statsData.length > 0) {
-        setLastScraped(new Date(statsData[0].last_scrape_time));
-      }
     } catch (err) {
       console.error('Error fetching bills:', err);
       setError('Failed to load bills. Please try again later.');
@@ -94,42 +77,7 @@ export const ScrapingProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setScrapingStatus('idle');
     }
-  };
-
-  const stopScrapingJob = async () => {
-    if (scrapingStatus !== 'scraping') {
-      return;
-    }
-    
-    try {
-      await cancelScraping();
-      toast.success('Scraping job cancelled');
-      setScrapingStatus('idle');
-    } catch (err) {
-      console.error('Error cancelling scraping job:', err);
-      toast.error('Failed to cancel scraping job');
-    }
-  };
-
-  const startScrapingIndividualJob = async () => {
-    setScrapingStatus('scraping')
-
-    toast.loading('Starting individual scraping job...', { id: 'scraping'});
-
-    try {
-      const data = await scrapeIndividual()
-      console.log('data from Context:', data)
-      setIndividualBillContents(data)
-      
-      toast.success('Scraping job completed successfully', { id: 'scraping' });
-    } catch (e) {
-      console.error('Error during scraping:', e);
-      toast.error('Scraping job failed', { id: 'scraping' });
-      setError('Failed to complete scraping job');
-    } finally {
-      setScrapingStatus('idle');
-    }
-  }
+  };  
 
   useEffect(() => {
     refreshBills();
@@ -139,15 +87,15 @@ export const ScrapingProvider = ({ children }: { children: ReactNode }) => {
     <ScrapingContext.Provider
       value={{
         bills,
+        foodBills,
         isLoading,
         error,
         scrapingStatus,
         refreshBills,
         startScrapingJob,
-        stopScrapingJob,
         totalBills,
+        totalFoodBills,
         lastScraped,
-        startScrapingIndividualJob,
         individualBillContents
       }}
     >
