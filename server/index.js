@@ -13,6 +13,9 @@ const __dirname = path.dirname(__filename);
 
 const distPath = path.join(__dirname, '..', 'dist');
 
+// Serve Let's Encrypt challenge files
+app.use('/.well-known', express.static(path.join(__dirname, '..', '.well-known')));
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
