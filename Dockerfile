@@ -1,5 +1,5 @@
 FROM node:18
-
+   
 # Install cron
 RUN apt-get update && apt-get install -y cron && rm -rf /var/lib/apt/lists/*
 
@@ -15,12 +15,8 @@ RUN npm install
 # Copy application code
 COPY . .
 
-# Build the Vite frontend
+# Build Vite frontend
 RUN npm run build
-
-# Create .well-known directory for Let's Encrypt challenges
-RUN mkdir -p /app/.well-known/acme-challenge && \
-    chmod -R 755 /app/.well-known
 
 # Expose port
 EXPOSE 5000
