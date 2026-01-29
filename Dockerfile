@@ -22,5 +22,8 @@ RUN npm run build
 RUN mkdir -p /app/.well-known/acme-challenge && \
     chmod -R 755 /app/.well-known
 
+# Set up cron job to run scrape-bills.js every minute
+RUN echo "* * * * * cd /app && node ./server/scrape-bills.js >> /proc/1/fd/1 2>&1" | crontab -
+
 # Expose port
 EXPOSE 5000
