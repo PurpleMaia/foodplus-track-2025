@@ -15,8 +15,5 @@ RUN npm install
 # Copy application code
 COPY . .
 
-# Build Vite frontend
-RUN npm run build
-
 # Expose port
 EXPOSE 5000
