@@ -22,12 +22,12 @@ RUN npm run build
 RUN mkdir -p /app/.well-known/acme-challenge && \
     chmod -R 755 /app/.well-known
 
-# Copy and make wrapper executable
-COPY scripts/run-cron.sh /app/scripts/run-cron.sh
-RUN chmod +x /app/scripts/run-cron.sh
+# Copy start script
+COPY scripts/start.sh /app/scripts/start.sh
+RUN chmod +x /app/scripts/start.sh
 
-# Initialize cron job with wrapper script
-RUN echo "* * * * * /app/scripts/run-cron.sh >> /proc/1/fd/1 2>&1" | crontab -
+# Add cron job that sources env vars
+RUN echo "* * * * * . /app/.cron-env && cd /app && node ./server/scrape-bills.js >> /proc/1/fd/1 2>&1" | crontab -
 
 # Expose port
 EXPOSE 5000

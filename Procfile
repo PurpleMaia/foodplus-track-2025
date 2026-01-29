@@ -1,1 +1,1 @@
-web: bash -c "cron && node server/index.js"
+web: /app/scripts/start.sh
