@@ -218,6 +218,7 @@ export async function saveBills(bills) {
               committee_assignment: bill.committee_assignment || null,
               introducer: bill.introducer || null,
               food_related: isFoodRelated,
+              archived: false,
               created_at: new Date(),
               updated_at: new Date(),
             })
