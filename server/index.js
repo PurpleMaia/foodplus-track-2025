@@ -24,6 +24,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// Serve Let's Encrypt challenge files
+app.use('/.well-known', express.static(path.join(__dirname, '..', '.well-known')));
+
 // API routes
 app.use('/api', apiRouter);
 

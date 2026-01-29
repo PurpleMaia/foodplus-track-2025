@@ -1,0 +1,1 @@
+web: cron && node server/index.js
