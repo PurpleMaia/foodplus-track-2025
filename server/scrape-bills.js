@@ -8,23 +8,29 @@ async function main() {
     // const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
 
 
-    // console.log('[MAIN] Scraping House bills...');
-    // const startTime = Date.now();
+    console.log('[MAIN] Scraping House bills...');
+    const startTime = Date.now();
     
+    setTimeout(() => {
+        console.log('Simulated scraping of House bills completed.');
+    }, 2000); // Simulate a 2-second scraping task
     // await startScraping(houseURL);
     
-    // const endTime = Date.now();
-    // const duration = (endTime - startTime) / 1000 / 60; // in minutes
-    // console.log(`[MAIN] Finished scraping House bills in ${duration} minutes.`);
+    const endTime = Date.now();
+    const duration = (endTime - startTime) / 1000 / 60; // in minutes
+    console.log(`[MAIN] Finished scraping House bills in ${duration} minutes.`);
 
-    // console.log('[MAIN] Scraping Senate bills...');
-    // const startTimeSenate = Date.now();
+    console.log('[MAIN] Scraping Senate bills...');
+    const startTimeSenate = Date.now();
 
+    setTimeout(() => {
+        console.log('Simulated scraping of Senate bills completed.');
+    }, 2000); // Simulate a 2-second scraping task
     // await startScraping(senateURL);
 
-    // const endTimeSenate = Date.now();
-    // const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60; // in minutes
-    // console.log(`[MAIN] Finished scraping Senate bills in ${durationSenate} minutes.`);
+    const endTimeSenate = Date.now();
+    const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60; // in minutes
+    console.log(`[MAIN] Finished scraping Senate bills in ${durationSenate} minutes.`);
 }
 
 main().catch((error) => {
