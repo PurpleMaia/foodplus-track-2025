@@ -13,7 +13,7 @@ async function main() {
     
     setTimeout(() => {
         console.log('Simulated scraping of House bills completed.');
-    }, 2000); // Simulate a 2-second scraping task
+    }, 1000 * 60 * 5); // Simulate a 5-minute scraping task
     // await startScraping(houseURL);
     
     const endTime = Date.now();
@@ -25,7 +25,7 @@ async function main() {
 
     setTimeout(() => {
         console.log('Simulated scraping of Senate bills completed.');
-    }, 2000); // Simulate a 2-second scraping task
+    }, 1000 * 60 * 5); // Simulate a 5-minute scraping task
     // await startScraping(senateURL);
 
     const endTimeSenate = Date.now();
