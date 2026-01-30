@@ -1,0 +1,8 @@
+{
+    "cron": [
+        {
+            "command": "npm run cron:scrape",
+            "schedule": "* * * * *"
+        }
+    ]
+}
