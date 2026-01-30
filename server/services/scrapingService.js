@@ -50,7 +50,7 @@ export async function startScraping(url) {
     const bills = await scrapeBills(url);
     const individualBillsData = [];
     
-    // return bill ids
+    // return bill ids for scraping individual bills
     const billIds = await saveBills(bills);
     await updateScrapingStats(billIds.length, true);
 
@@ -145,9 +145,9 @@ export async function saveBills(bills) {
 
   let billIds = [];
   const newBills = [];
-  
-  // First pass: update existing bills, collect new bills
-  console.log('[SAVE] First pass: updating existing bills...');
+
+  // First pass: find existing bills, collect new bills
+  console.log('[SAVE] First pass: finding existing bills...');
   for (const bill of bills) {
     if (shouldCancelScraping) {
       console.log('Saving cancelled by user');
@@ -177,6 +177,10 @@ export async function saveBills(bills) {
           })
           .where('id', '=', existingBill.id)
           .execute();
+
+        // Log the existing bill ID for scrapeIndividual use
+        billIds.push(existingBill.id);
+        
         console.log(`[SAVE] Updated existing bill: ${bill.bill_number}`);
       } else {
         // Collect new bills for batched LLM processing
@@ -302,8 +306,8 @@ export async function scrapeIndividual(billClassifier) {
     url = billClassifier
   } else {
     // bill id was passed through api call
-    console.log('[INDIVIDUAL] using billID...')
-    billID = billClassifier
+    console.log('[INDIVIDUAL] using billID...');
+    billID = billClassifier;
 
     // get bill_url from passed in billID parameter
     const result = await db
@@ -312,23 +316,25 @@ export async function scrapeIndividual(billClassifier) {
       .where('id', '=', billID)
       .executeTakeFirst();
 
-    console.log('[INDIVIDUAL] found bill url:', result.bill_url)
+    // console.log('[INDIVIDUAL] found bill url:', result.bill_url)
     url = result.bill_url
   }
   
-  // error handle if the url is from the old scrape (has all the html)
+  // normalize if the url is from the old scrape (has all the html)
   if (url.startsWith('<a')) {
     const match = url.match(/href=(["']?)([^"'\s>]+)\1/);
     url = match ? match[2] : null;
     console.log('[INDIVIDUAL] Had to convert:', url)
   }
 
-  // modify url to use data. instead of www.
+  // modify url to use data subdomain instead of www subdomain
   const updatedUrl = url.replace("www.", "data.");
+
   try {
-    // ==== test-scrape.js ====
-     console.log('[INDIVIDUAL] Scraping individual page...')
-     await delay(1000)
+    console.log('[INDIVIDUAL] Scraping individual page...')
+
+    // rate limiting delay
+    await delay(1000)
 
     const response = await axios.get(updatedUrl, {
       headers: {
@@ -339,11 +345,10 @@ export async function scrapeIndividual(billClassifier) {
       timeout: 30000,
       maxRedirects: 5,
     });
-    // =========================    
 
     const $ = cheerio.load(response.data)
 
-    // 5. Extract introducers
+    // extract base metadata from the page
     const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
     const currentStatus = $('#MainContent_ListView1_current_statusLabel_0').text().trim();
     const committeeAssignment = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
@@ -352,6 +357,7 @@ export async function scrapeIndividual(billClassifier) {
     const billNumber = $('#MainContent_LinkButtonMeasure').text().trim().split(' ')[0];
 
     // If new bill, insert into bills table to get billID for foreign key constraints
+    // Should only happen when using URL parameter
     if (newBill) {
       console.log('[INDIVIDUAL] This is a NEW BILL, inserting bill info into bills table...')
       const newBillId = await db
@@ -370,10 +376,9 @@ export async function scrapeIndividual(billClassifier) {
       billID = newBillId.id
     }
 
+    // extract status updates
     const updates = []
     $('#MainContent_GridViewStatus tr').each((i, row) => {
-      // console.log('Number of status rows:', $('#MainContent_GridViewStatus tr').length);
-
       const tds = $(row).find('td');
       if (tds.length === 3) {
         const date = $(tds[0]).text().trim();
@@ -390,6 +395,7 @@ export async function scrapeIndividual(billClassifier) {
       }
     });
 
+    // build bill data object to return, including updates array
     const billData = {
       bill_url: updatedUrl,
       bill_number: billNumber,
@@ -402,10 +408,11 @@ export async function scrapeIndividual(billClassifier) {
     };
 
     console.log('[INDIVIDUAL] # Updates found:', updates.length)
+
+    // save updates to database
     await saveUpdates(updates)
 
     return billData;
-
   } catch (error) {
     console.error('[INDIVIDUAL] Error scraping bills:', error);
   }
