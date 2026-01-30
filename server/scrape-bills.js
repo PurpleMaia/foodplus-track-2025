@@ -4,17 +4,14 @@ async function main() {
     const currentYear = new Date().getFullYear();
     console.log(`Starting cron job, scraping for year ${currentYear}...`);
 
-    // const houseURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
-    // const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
+    const houseURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
+    const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
 
 
     console.log('[MAIN] Scraping House bills...');
     const startTime = Date.now();
     
-    setTimeout(() => {
-        console.log('Simulated scraping of House bills completed.');
-    }, 1000 * 60 * 5); // Simulate a 5-minute scraping task
-    // await startScraping(houseURL);
+    await startScraping(houseURL);
     
     const endTime = Date.now();
     const duration = (endTime - startTime) / 1000 / 60; // in minutes
@@ -23,10 +20,7 @@ async function main() {
     console.log('[MAIN] Scraping Senate bills...');
     const startTimeSenate = Date.now();
 
-    setTimeout(() => {
-        console.log('Simulated scraping of Senate bills completed.');
-    }, 1000 * 60 * 5); // Simulate a 5-minute scraping task
-    // await startScraping(senateURL);
+    await startScraping(senateURL);
 
     const endTimeSenate = Date.now();
     const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60; // in minutes
