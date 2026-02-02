@@ -421,38 +421,30 @@ export async function scrapeIndividual(billClassifier) {
 
 export async function saveUpdates(updates) {
   if (!updates || updates.length === 0) {
-    console.log('[SAVE UPDATES] No bills to save');
+    console.log('[SAVE UPDATES] No updates to save');
     return 0;
   }
-  console.log(`[SAVE UPDATES] Saving ${updates.length} updates to database...`);
-  let successCount = 0;
-  for (const update of updates) {
-    if (shouldCancelScraping) {
-      console.log('[SAVE UPDATES] Saving cancelled by user');
-      break;
-    }
-    try {
-      const existingUpdate = await db
-        .selectFrom('status_updates')
-        .select(['id', 'bill_id', 'chamber', 'date', 'statustext'])
-        .where('bill_id', '=', update.bill_id)
-        .where('chamber', '=', update.chamber)
-        .where('date', '=', update.date)
-        .where('statustext', '=', update.statustext)
-        .limit(1)
-        .executeTakeFirst();
-      // console.log('existingUpdate:', existingUpdate);
-      if (!existingUpdate) {        
-        console.log('[updates] NEW UPDATE! inserting into db...')
-        await db
-          .insertInto('status_updates')
-          .values(update)
-          .executeTakeFirst();
-      }
-      successCount++;
-    } catch (error) {
-      console.error('Error saving update:', error);
-    }
-  }  
-  return successCount;
+
+  const billId = updates[0].bill_id;
+  console.log(`[SAVE UPDATES] Replacing ${updates.length} updates for bill ${billId}...`);
+
+  try {
+    // Delete all existing updates for this bill
+    await db
+      .deleteFrom('status_updates')
+      .where('bill_id', '=', billId)
+      .execute();
+
+    // Insert all fresh updates
+    await db
+      .insertInto('status_updates')
+      .values(updates)
+      .execute();
+
+    console.log(`[SAVE UPDATES] Saved ${updates.length} updates for bill ${billId}`);
+    return updates.length;
+  } catch (error) {
+    console.error(`[SAVE UPDATES] Error saving updates for bill ${billId}:`, error);
+    return 0;
+  }
 }
