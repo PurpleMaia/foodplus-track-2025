@@ -412,6 +412,18 @@ export async function scrapeIndividual(billClassifier) {
     // save updates to database
     await saveUpdates(updates)
 
+    // save bill data if new amendments were made
+    await db.updateTable('bills')
+      .set({
+        description: description,
+        committee_assignment: committeeAssignment,
+        introducer: introducers,
+        updated_at: new Date(),
+      })
+      .where('id', '=', billID)
+      .execute();
+    console.log('[INDIVIDUAL] Bill data updated', billID);
+
     return billData;
   } catch (error) {
     console.error('[INDIVIDUAL] Error scraping bills:', error);
