@@ -17,6 +17,16 @@ const getRandomUserAgent = () => userAgents[Math.floor(Math.random() * userAgent
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Timeout settings
+const MAIN_LIST_TIMEOUT = 60000; // 60s for main bill list pages
+const INDIVIDUAL_TIMEOUT = 45000; // 45s for individual bill pages
+const MAIN_LIST_MAX_RETRIES = 3;
+const MAIN_LIST_RETRY_DELAY = 5000; // 5s between retries
+
+// Individual scraping concurrency
+const INDIVIDUAL_BATCH_SIZE = 5;
+const INDIVIDUAL_BATCH_DELAY = 2000; // 2s between batches
+
 export async function main() {
     const currentYear = new Date().getFullYear();
     console.log(`Starting server job scraping for year ${currentYear}...`);
@@ -46,89 +56,145 @@ export async function main() {
 
 // Start the scraping process for the Hawaii State Legislature website
 export async function startScraping(url) {
+  const startTime = Date.now();
+  let billCount = 0;
+  let individualSuccessCount = 0;
+  let individualFailCount = 0;
+
   try {
     const bills = await scrapeBills(url);
-    const individualBillsData = [];
-    
+    billCount = bills.length;
+
     // return bill ids for scraping individual bills
     const billIds = await saveBills(bills);
-    await updateScrapingStats(billIds.length, true);
 
-    for (const id of billIds) {
-      const individualBillData = await scrapeIndividual(id);
-      if (individualBillData) {
-        individualBillsData.push(individualBillData);
-      }      
+    // Scrape individual bills in batches for concurrency
+    const individualBillsData = [];
+    console.log(`[INDIVIDUAL] Scraping ${billIds.length} individual bills in batches of ${INDIVIDUAL_BATCH_SIZE}...`);
+
+    for (let i = 0; i < billIds.length; i += INDIVIDUAL_BATCH_SIZE) {
+      if (shouldCancelScraping) {
+        console.log('[INDIVIDUAL] Scraping cancelled by user');
+        break;
+      }
+
+      const batch = billIds.slice(i, i + INDIVIDUAL_BATCH_SIZE);
+      const batchNum = Math.floor(i / INDIVIDUAL_BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(billIds.length / INDIVIDUAL_BATCH_SIZE);
+      console.log(`[INDIVIDUAL] Batch ${batchNum}/${totalBatches} (bills ${i + 1}-${Math.min(i + INDIVIDUAL_BATCH_SIZE, billIds.length)})`)
+
+      const batchResults = await Promise.allSettled(
+        batch.map(id => scrapeIndividual(id))
+      );
+
+      for (const result of batchResults) {
+        if (result.status === 'fulfilled' && result.value) {
+          individualBillsData.push(result.value);
+          individualSuccessCount++;
+        } else {
+          individualFailCount++;
+          if (result.status === 'rejected') {
+            console.error('[INDIVIDUAL] Batch item rejected:', result.reason?.message || result.reason);
+          }
+        }
+      }
+
+      // Delay between batches (skip on last batch)
+      if (i + INDIVIDUAL_BATCH_SIZE < billIds.length) {
+        await delay(INDIVIDUAL_BATCH_DELAY);
+      }
     }
+
+    const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
+    const statsMessage = `Scraped ${billCount} bills, ${individualSuccessCount}/${billIds.length} individual pages in ${durationSec}s` +
+      (individualFailCount > 0 ? ` (${individualFailCount} individual failures)` : '');
+    console.log(`[STATS] ${statsMessage}`);
+    await updateScrapingStats(billIds.length, true, individualFailCount > 0 ? `${individualFailCount} individual scrape failures` : null);
 
     // Return both regular bills and individual bill data
     return { bills, individualBillsData };
   } catch (error) {
     console.error('Error during scraping:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
+    const errorMessage = `${error instanceof Error ? error.message : 'Unknown error'} (after ${durationSec}s, ${billCount} bills found)`;
     await updateScrapingStats(0, false, errorMessage);
     throw error;
   }
 }
 
-// Scrape bills from the Hawaii State Legislature website
+// Scrape bills from the Hawaii State Legislature website (with retry)
 export async function scrapeBills(url) {
-  try {
-    console.log('Scraping bills from a main bill list...');
-    await delay(1000);
-    const response = await axios.get(url, {
-      headers: {
-        'User-Agent': getRandomUserAgent(),
-        Accept: 'text/html',
-        Referer: 'https://data.capitol.hawaii.gov',
-      },
-      timeout: 30000,
-      maxRedirects: 5,
-    });
-    const $ = cheerio.load(response.data);
-    const bills = [];
-    const rows = $('table tr').toArray().slice(1); // Skip header row
+  let lastError;
 
-    for (const element of rows) {
-      if (shouldCancelScraping) {
-        console.log('Scraping cancelled by user');
-        return [];
+  for (let attempt = 1; attempt <= MAIN_LIST_MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[ALL BILLS] Scraping main bill list (attempt ${attempt}/${MAIN_LIST_MAX_RETRIES})...`);
+      await delay(attempt === 1 ? 1000 : MAIN_LIST_RETRY_DELAY);
+
+      const response = await axios.get(url, {
+        headers: {
+          'User-Agent': getRandomUserAgent(),
+          Accept: 'text/html',
+          Referer: 'https://data.capitol.hawaii.gov',
+        },
+        timeout: MAIN_LIST_TIMEOUT,
+        maxRedirects: 5,
+      });
+      const $ = cheerio.load(response.data);
+      const bills = [];
+      const rows = $('table tr').toArray().slice(1); // Skip header row
+
+      for (const element of rows) {
+        if (shouldCancelScraping) {
+          console.log('Scraping cancelled by user');
+          return [];
+        }
+
+        const billLink = $(element).find('a.report');
+        const billUrl = billLink.attr('href');
+        const billNumber = billLink.text().trim();
+        const billYear = new URL(billUrl, 'https://data.capitol.hawaii.gov').searchParams.get('year');
+        const measureStatus = $(element).find('td:nth-child(2) span');
+        const measureTitle = measureStatus.eq(2).text().trim();
+        const description = measureStatus.eq(3).text().trim();
+        const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
+        const introducers = $(element).find('td:nth-child(4)').text().trim();
+        const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
+
+        if (billUrl) {
+          bills.push({
+            bill_url: billUrl,
+            bill_number: billNumber,
+            year: billYear,
+            bill_title: measureTitle,
+            description: description,
+            current_status_string: currentStatus,
+            committee_assignment: committeeAssignment,
+            introducer: introducers,
+          });
+        }
       }
 
-      const billLink = $(element).find('a.report');
-      const billUrl = billLink.attr('href');
-      const billNumber = billLink.text().trim();
-      const billYear = new URL(billUrl, 'https://data.capitol.hawaii.gov').searchParams.get('year');
-      const measureStatus = $(element).find('td:nth-child(2) span');
-      const measureTitle = measureStatus.eq(2).text().trim();
-      const description = measureStatus.eq(3).text().trim();
-      const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
-      const introducers = $(element).find('td:nth-child(4)').text().trim();
-      const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
+      console.log(`[ALL BILLS] Scraped ${bills.length} bills`);
+      return bills;
+    } catch (error) {
+      lastError = error;
+      const isTimeout = error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT' ||
+        error?.message?.toLowerCase().includes('timeout');
+      const isNetworkError = error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' ||
+        error?.response?.status === 503 || error?.response?.status === 502;
 
-      if (billUrl) {
-        bills.push({
-          bill_url: billUrl,
-          bill_number: billNumber,
-          year: billYear,
-          bill_title: measureTitle,
-          description: description,
-          current_status_string: currentStatus,
-          committee_assignment: committeeAssignment,
-          introducer: introducers,
-        });
+      if ((isTimeout || isNetworkError) && attempt < MAIN_LIST_MAX_RETRIES) {
+        console.warn(`[ALL BILLS] Attempt ${attempt} failed (${error.message}). Retrying in ${MAIN_LIST_RETRY_DELAY / 1000}s...`);
+        continue;
       }
-    }
 
-    console.log(`[ALL BILLS] Scraped ${bills.length} bills`);
-    return bills;
-  } catch (error) {
-    console.error('[ALL BILLS] Error scraping bills:', error);
-    if (error.response && error.response.status === 403) {
-      // ... existing retry logic ...
+      console.error(`[ALL BILLS] Failed after ${attempt} attempt(s):`, error.message);
+      throw error;
     }
-    throw error;
   }
+
+  throw lastError;
 }
 
 // Save bills to the database
@@ -258,18 +324,20 @@ export async function saveBills(bills) {
 // Update scraping statistics
 export async function updateScrapingStats(billsSaved, success, errorMessage) {
   try {
+    // Truncate error message to avoid db column overflow
+    const truncatedError = errorMessage ? errorMessage.substring(0, 500) : null;
     await db
       .insertInto('scraping_stats')
       .values({
         bills_scraped: billsSaved,
         success: success,
-        error_message: errorMessage || null,
+        error_message: truncatedError,
         last_scrape_time: new Date(),
       })
       .execute();
-    console.log('Scraping stats updated');
+    console.log(`[STATS] Scraping stats updated: ${billsSaved} bills, success=${success}${truncatedError ? `, error=${truncatedError}` : ''}`);
   } catch (error) {
-    console.error('Error updating scraping stats:', error);
+    console.error('[STATS] Error updating scraping stats:', error);
     throw error;
   }
 }
@@ -342,7 +410,7 @@ export async function scrapeIndividual(billClassifier) {
         Accept: 'text/html',
         Referer: 'https://data.capitol.hawaii.gov',
       },
-      timeout: 30000,
+      timeout: INDIVIDUAL_TIMEOUT,
       maxRedirects: 5,
     });
 

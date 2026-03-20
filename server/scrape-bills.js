@@ -4,7 +4,9 @@ async function main() {
     const currentYear = new Date().getFullYear();
     console.log(`Starting cron job, scraping for year ${currentYear}...`);
 
+
     const houseURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
+    // https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2026&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%202026%20Only
     const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
 
 
