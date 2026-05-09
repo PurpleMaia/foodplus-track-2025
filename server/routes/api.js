@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { main, saveBills, updateScrapingStats, scrapeIndividual } from '../services/scrapingService.js';
 import { getAllBillsContext } from '../services/bills.js';
+import { db } from '../../db/kysely/client.js';
+import { sendAlertEmail } from '../services/alertService.js';
 const router = Router();
 
 // GET /api/scrape-bills - Start scraping process
@@ -71,7 +73,53 @@ router.post('/scrape-individual', async (req, res) =>{
     console.log('Error in scrape-individual endpoint:', error);
   }
 })
-export default router;
+
+// GET /api/cron-health - Check if cron job has run recently
+router.get('/cron-health', async (req, res) => {
+  try {
+    const latest = await db
+      .selectFrom('scraping_stats')
+      .select(['last_scrape_time', 'success', 'error_message', 'bills_scraped'])
+      .orderBy('last_scrape_time', 'desc')
+      .limit(1)
+      .executeTakeFirst();
+
+    if (!latest) {
+      const msg = 'No scraping stats found — cron job may have never run.';
+      await sendAlertEmail('No scraping history found', msg);
+      return res.json({ healthy: false, reason: msg });
+    }
+
+    const hoursSince = (Date.now() - new Date(latest.last_scrape_time).getTime()) / (1000 * 60 * 60);
+    const stale = hoursSince > 26;
+    const healthy = !stale && latest.success;
+
+    if (stale) {
+      await sendAlertEmail('Cron job has not run', [
+        `The last scrape was ${hoursSince.toFixed(1)} hours ago (${latest.last_scrape_time}).`,
+        `Expected a scrape within the last 26 hours.`,
+        '',
+        `Last result: success=${latest.success}, bills_scraped=${latest.bills_scraped}`,
+        latest.error_message ? `Error: ${latest.error_message}` : '',
+      ].join('\n'));
+    }
+
+    res.json({
+      healthy,
+      lastScrapeTime: latest.last_scrape_time,
+      hoursSinceLastScrape: Math.round(hoursSince * 10) / 10,
+      lastSuccess: latest.success,
+      lastBillsScraped: latest.bills_scraped,
+      lastError: latest.error_message || null,
+    });
+  } catch (error) {
+    console.error('Error in cron-health endpoint:', error);
+    res.status(500).json({
+      healthy: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
 
 // GET /api/all-bills-context
 router.get('/all-bills-context', async (req, res) => {
@@ -80,9 +128,11 @@ router.get('/all-bills-context', async (req, res) => {
     res.json({ allBills, foodBills, lastScrapeTime });
   } catch (error) {
     console.error('Error in all-bills-context endpoint:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to get bills context',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 });
+
+export default router;

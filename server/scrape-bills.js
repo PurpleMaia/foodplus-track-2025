@@ -1,36 +1,86 @@
 import { startScraping } from './services/scrapingService.js';
+import { sendAlertEmail } from './services/alertService.js';
 
 async function main() {
     const currentYear = new Date().getFullYear();
     console.log(`Starting cron job, scraping for year ${currentYear}...`);
 
-
     const houseURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
-    // https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=2026&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%202026%20Only
     const senateURL = `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`;
 
+    const errors = [];
 
     console.log('[MAIN] Scraping House bills...');
     const startTime = Date.now();
-    
-    await startScraping(houseURL);
-    
+
+    const houseResult = await startScraping(houseURL);
+
     const endTime = Date.now();
-    const duration = (endTime - startTime) / 1000 / 60; // in minutes
-    console.log(`[MAIN] Finished scraping House bills in ${duration} minutes.`);
+    const duration = (endTime - startTime) / 1000 / 60;
+    console.log(`[MAIN] Finished scraping House bills in ${duration.toFixed(1)} minutes.`);
+
+    if (!houseResult?.bills?.length) {
+      errors.push(`House bills: 0 bills scraped from ${houseURL}`);
+    }
 
     console.log('[MAIN] Scraping Senate bills...');
     const startTimeSenate = Date.now();
 
-    await startScraping(senateURL);
+    const senateResult = await startScraping(senateURL);
 
     const endTimeSenate = Date.now();
-    const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60; // in minutes
-    console.log(`[MAIN] Finished scraping Senate bills in ${durationSenate} minutes.`);
+    const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60;
+    console.log(`[MAIN] Finished scraping Senate bills in ${durationSenate.toFixed(1)} minutes.`);
+
+    if (!senateResult?.bills?.length) {
+      errors.push(`Senate bills: 0 bills scraped from ${senateURL}`);
+    }
+
+    // Collect all individual failures across both chambers
+    const allIndividualFailures = [];
+    for (const [label, result] of [['House', houseResult], ['Senate', senateResult]]) {
+      if (result?.individualFailCount > 0) {
+        errors.push(`${label}: ${result.individualFailCount}/${result.totalIndividual} individual bill scrapes failed`);
+        for (const f of (result.individualFailures || [])) {
+          allIndividualFailures.push({ ...f, chamber: label });
+        }
+      }
+    }
+
+    if (errors.length > 0) {
+      const body = [
+        `Cron job completed at ${new Date().toISOString()} with issues:`,
+        '',
+        ...errors.map(e => `- ${e}`),
+        '',
+        `Year: ${currentYear}`,
+        `House bills scraped: ${houseResult?.bills?.length ?? 0}`,
+        `Senate bills scraped: ${senateResult?.bills?.length ?? 0}`,
+      ];
+
+      if (allIndividualFailures.length > 0) {
+        body.push('', '--- Individual Bill Failures ---', '');
+        for (const f of allIndividualFailures) {
+          body.push(`  [${f.chamber}] Bill ID ${f.billId}: ${f.reason}`);
+        }
+      }
+
+      await sendAlertEmail('Scraping completed with failures', body.join('\n'));
+    }
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error('Error during cron job scraping:', error);
+
+  await sendAlertEmail('Cron job CRASHED', [
+    `The daily scrape cron job crashed at ${new Date().toISOString()}.`,
+    '',
+    `Error: ${error?.message || error}`,
+    '',
+    `Stack trace:`,
+    error?.stack || 'No stack trace available',
+  ].join('\n'));
+
   process.exit(1);
 });
 

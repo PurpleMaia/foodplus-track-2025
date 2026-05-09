@@ -23,9 +23,11 @@ const INDIVIDUAL_TIMEOUT = 45000; // 45s for individual bill pages
 const MAIN_LIST_MAX_RETRIES = 3;
 const MAIN_LIST_RETRY_DELAY = 5000; // 5s between retries
 
-// Individual scraping concurrency
+// Individual scraping settings
 const INDIVIDUAL_BATCH_SIZE = 5;
 const INDIVIDUAL_BATCH_DELAY = 2000; // 2s between batches
+const INDIVIDUAL_MAX_RETRIES = 3;
+const INDIVIDUAL_RETRY_DELAY = 3000; // 3s base delay, doubles each retry
 
 export async function main() {
     const currentYear = new Date().getFullYear();
@@ -60,6 +62,7 @@ export async function startScraping(url) {
   let billCount = 0;
   let individualSuccessCount = 0;
   let individualFailCount = 0;
+  const individualFailures = []; // per-bill failure details for alerting
 
   try {
     const bills = await scrapeBills(url);
@@ -87,15 +90,19 @@ export async function startScraping(url) {
         batch.map(id => scrapeIndividual(id))
       );
 
-      for (const result of batchResults) {
+      for (let j = 0; j < batchResults.length; j++) {
+        const result = batchResults[j];
+        const billId = batch[j];
         if (result.status === 'fulfilled' && result.value) {
           individualBillsData.push(result.value);
           individualSuccessCount++;
         } else {
           individualFailCount++;
-          if (result.status === 'rejected') {
-            console.error('[INDIVIDUAL] Batch item rejected:', result.reason?.message || result.reason);
-          }
+          const reason = result.status === 'rejected'
+            ? (result.reason?.message || String(result.reason))
+            : 'Returned empty result';
+          console.error(`[INDIVIDUAL] Failed bill ${billId}: ${reason}`);
+          individualFailures.push({ billId, reason });
         }
       }
 
@@ -111,8 +118,8 @@ export async function startScraping(url) {
     console.log(`[STATS] ${statsMessage}`);
     await updateScrapingStats(billIds.length, true, individualFailCount > 0 ? `${individualFailCount} individual scrape failures` : null);
 
-    // Return both regular bills and individual bill data
-    return { bills, individualBillsData };
+    // Return bills, individual bill data, and failure details for alerting
+    return { bills, individualBillsData, individualFailCount, individualFailures, totalIndividual: billIds.length };
   } catch (error) {
     console.error('Error during scraping:', error);
     const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -398,104 +405,124 @@ export async function scrapeIndividual(billClassifier) {
   // modify url to use data subdomain instead of www subdomain
   const updatedUrl = url.replace("www.", "data.");
 
-  try {
-    console.log('[INDIVIDUAL] Scraping individual page...')
+  let lastError;
 
-    // rate limiting delay
-    await delay(1000)
+  for (let attempt = 1; attempt <= INDIVIDUAL_MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[INDIVIDUAL] Scraping individual page (attempt ${attempt}/${INDIVIDUAL_MAX_RETRIES})...`)
 
-    const response = await axios.get(updatedUrl, {
-      headers: {
-        'User-Agent': getRandomUserAgent(),
-        Accept: 'text/html',
-        Referer: 'https://data.capitol.hawaii.gov',
-      },
-      timeout: INDIVIDUAL_TIMEOUT,
-      maxRedirects: 5,
-    });
+      // rate limiting delay — increases with each retry
+      await delay(attempt === 1 ? 1000 : INDIVIDUAL_RETRY_DELAY * (attempt - 1))
 
-    const $ = cheerio.load(response.data)
+      const response = await axios.get(updatedUrl, {
+        headers: {
+          'User-Agent': getRandomUserAgent(),
+          Accept: 'text/html',
+          Referer: 'https://data.capitol.hawaii.gov',
+        },
+        timeout: INDIVIDUAL_TIMEOUT,
+        maxRedirects: 5,
+      });
 
-    // extract base metadata from the page
-    const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
-    const currentStatus = $('#MainContent_ListView1_current_statusLabel_0').text().trim();
-    const committeeAssignment = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
-    const billTitle = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
-    const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
-    const billNumber = $('#MainContent_LinkButtonMeasure').text().trim().split(' ')[0];
+      const $ = cheerio.load(response.data)
 
-    // If new bill, insert into bills table to get billID for foreign key constraints
-    // Should only happen when using URL parameter
-    if (newBill) {
-      console.log('[INDIVIDUAL] This is a NEW BILL, inserting bill info into bills table...')
-      const newBillId = await db
-        .insertInto('bills')
-        .values({
-          bill_url: url,
-          description: description,
-          current_status_string: currentStatus,
-          committee_assignment: committeeAssignment,          
-          bill_title: billTitle,
-          introducer: introducers,
-          bill_number: billNumber,
-          updated_at: new Date(),
-        }).returning('bills.id').executeTakeFirst();
-      console.log('[INDIVIDUAL] New bill inserted with ID:', newBillId.id)
-      billID = newBillId.id
-    }
+      // extract base metadata from the page
+      const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
+      const currentStatus = $('#MainContent_ListView1_current_statusLabel_0').text().trim();
+      const committeeAssignment = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
+      const billTitle = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
+      const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
+      const billNumber = $('#MainContent_LinkButtonMeasure').text().trim().split(' ')[0];
 
-    // extract status updates
-    const updates = []
-    $('#MainContent_GridViewStatus tr').each((i, row) => {
-      const tds = $(row).find('td');
-      if (tds.length === 3) {
-        const date = $(tds[0]).text().trim();
-        const chamber = $(tds[1]).text().trim();
-        const statusText = $(tds[2]).text().trim();
-
-        // building row in status_updates
-        updates.push({
-          bill_id: billID, // FK
-          chamber: chamber,
-          date: date,
-          statustext: statusText
-        });    
+      // If new bill, insert into bills table to get billID for foreign key constraints
+      // Should only happen when using URL parameter
+      if (newBill) {
+        console.log('[INDIVIDUAL] This is a NEW BILL, inserting bill info into bills table...')
+        const newBillId = await db
+          .insertInto('bills')
+          .values({
+            bill_url: url,
+            description: description,
+            current_status_string: currentStatus,
+            committee_assignment: committeeAssignment,
+            bill_title: billTitle,
+            introducer: introducers,
+            bill_number: billNumber,
+            updated_at: new Date(),
+          }).returning('bills.id').executeTakeFirst();
+        console.log('[INDIVIDUAL] New bill inserted with ID:', newBillId.id)
+        billID = newBillId.id
+        newBill = false; // only insert once even if we somehow retry past this point
       }
-    });
 
-    // build bill data object to return, including updates array
-    const billData = {
-      bill_url: updatedUrl,
-      bill_number: billNumber,
-      bill_title: billTitle,
-      description: description,
-      current_status: currentStatus,
-      committee_assignment: committeeAssignment,
-      introducer: introducers,
-      updates: updates
-    };
+      // extract status updates
+      const updates = []
+      $('#MainContent_GridViewStatus tr').each((_, row) => {
+        const tds = $(row).find('td');
+        if (tds.length === 3) {
+          const date = $(tds[0]).text().trim();
+          const chamber = $(tds[1]).text().trim();
+          const statusText = $(tds[2]).text().trim();
 
-    console.log('[INDIVIDUAL] # Updates found:', updates.length)
+          // building row in status_updates
+          updates.push({
+            bill_id: billID, // FK
+            chamber: chamber,
+            date: date,
+            statustext: statusText
+          });
+        }
+      });
 
-    // save updates to database
-    await saveUpdates(updates)
-
-    // save bill data if new amendments were made
-    await db.updateTable('bills')
-      .set({
+      // build bill data object to return, including updates array
+      const billData = {
+        bill_url: updatedUrl,
+        bill_number: billNumber,
+        bill_title: billTitle,
         description: description,
+        current_status: currentStatus,
         committee_assignment: committeeAssignment,
         introducer: introducers,
-        updated_at: new Date(),
-      })
-      .where('id', '=', billID)
-      .execute();
-    console.log('[INDIVIDUAL] Bill data updated', billID);
+        updates: updates
+      };
 
-    return billData;
-  } catch (error) {
-    console.error('[INDIVIDUAL] Error scraping bills:', error);
+      console.log('[INDIVIDUAL] # Updates found:', updates.length)
+
+      // save updates to database
+      await saveUpdates(updates)
+
+      // save bill data if new amendments were made
+      await db.updateTable('bills')
+        .set({
+          description: description,
+          committee_assignment: committeeAssignment,
+          introducer: introducers,
+          updated_at: new Date(),
+        })
+        .where('id', '=', billID)
+        .execute();
+      console.log('[INDIVIDUAL] Bill data updated', billID);
+
+      return billData;
+    } catch (error) {
+      lastError = error;
+      const isTimeout = error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT' ||
+        error?.message?.toLowerCase().includes('timeout');
+      const isNetworkError = error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' ||
+        error?.code === 'ECONNRESET' || error?.response?.status === 503 || error?.response?.status === 502;
+
+      if ((isTimeout || isNetworkError) && attempt < INDIVIDUAL_MAX_RETRIES) {
+        const retryIn = INDIVIDUAL_RETRY_DELAY * attempt;
+        console.warn(`[INDIVIDUAL] Attempt ${attempt} failed for ${billClassifier} (${error.message}). Retrying in ${retryIn / 1000}s...`);
+        continue;
+      }
+
+      console.error('[INDIVIDUAL] Error scraping bill:', billClassifier, error?.message || error);
+      throw new Error(`Bill ${billClassifier}: ${error?.message || error}`);
+    }
   }
+
+  throw new Error(`Bill ${billClassifier}: Failed after ${INDIVIDUAL_MAX_RETRIES} attempts — ${lastError?.message || lastError}`);
 
 }
 

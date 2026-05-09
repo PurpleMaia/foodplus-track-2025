@@ -1,8 +1,9 @@
 import React from 'react';
 import { useScrapingContext } from '../context/ScrapingContext';
-import { FileText, Clock, Check, RefreshCw, Leaf } from 'lucide-react';
+import { FileText, Clock, RefreshCw, Leaf } from 'lucide-react';
 import { format } from 'date-fns';
 import StatCard from './StatCard';
+import CronHealth from './CronHealth';
 
 const Dashboard: React.FC = () => {
   
@@ -66,17 +67,7 @@ const Dashboard: React.FC = () => {
           color="bg-yellow-50 border-yellow-200"
         />
         
-        <StatCard 
-          title="Scraping Status" 
-          value={scrapingStatus === 'scraping' ? 'Active' : 'Idle'} 
-          icon={
-            scrapingStatus === 'scraping' 
-              ? <RefreshCw className="w-8 h-8 text-amber-500 animate-spin" />
-              : <Check className="w-8 h-8 text-gray-500" />
-          }
-          description={scrapingStatus === 'scraping' ? 'Scraping in progress' : 'Ready to scrape'}
-          color={scrapingStatus === 'scraping' ? 'bg-amber-50 border-amber-200' : 'bg-gray-50 border-gray-200'}
-        />        
+        <CronHealth />        
       </div>
 
       <div className="bg-white rounded-lg shadow p-6">
