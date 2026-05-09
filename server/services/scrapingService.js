@@ -2,6 +2,8 @@ import { db } from '../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { determineIfFoodRelated } from './llm.js';
+import { isBillDead } from './dead-bill.js';
+import sessionDeadlines from '../../session-deadlines-2026.json' with { type: 'json' };
 
 // Flag to track if scraping should be cancelled
 let shouldCancelScraping = false;
@@ -503,6 +505,9 @@ export async function scrapeIndividual(billClassifier) {
         .execute();
       console.log('[INDIVIDUAL] Bill data updated', billID);
 
+      // check if the bill is dead after saving updates
+      await checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment, updates);
+
       return billData;
     } catch (error) {
       lastError = error;
@@ -524,6 +529,57 @@ export async function scrapeIndividual(billClassifier) {
 
   throw new Error(`Bill ${billClassifier}: Failed after ${INDIVIDUAL_MAX_RETRIES} attempts — ${lastError?.message || lastError}`);
 
+}
+
+/**
+ * Checks if a bill is dead after its status updates have been saved,
+ * and flips the `dead` boolean on the bills row if the status changed.
+ *
+ * @param {string} billID - the bill's DB id
+ * @param {string} billNumber - e.g. "HB123"
+ * @param {string} committeeAssignment - comma-separated committee names
+ * @param {Array<{bill_id: string, chamber: string, date: string, statustext: string}>} updates - the status updates just saved
+ */
+async function checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment, updates) {
+  try {
+    // Get the bill's current bill_status and dead flag from the DB
+    const bill = await db
+      .selectFrom('bills')
+      .select(['bill_status', 'dead'])
+      .where('id', '=', billID)
+      .executeTakeFirst();
+
+    if (!bill || !bill.bill_status) {
+      return;
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const result = isBillDead(
+      {
+        bill_number: billNumber,
+        bill_status: bill.bill_status,
+        committee_assignment: committeeAssignment,
+      },
+      updates.map(u => ({ statustext: u.statustext, date: u.date, chamber: u.chamber })),
+      sessionDeadlines,
+      today,
+    );
+
+    // Only update if the dead flag changed
+    if (result.dead !== (bill.dead ?? false)) {
+      await db
+        .updateTable('bills')
+        .set({ dead: result.dead })
+        .where('id', '=', billID)
+        .execute();
+
+      const action = result.dead ? 'DEAD' : 'ALIVE';
+      console.log(`[DEAD-BILL] ${billNumber}: ${action} — ${result.reason}`);
+    }
+  } catch (err) {
+    console.error(`[DEAD-BILL] Error checking dead status for ${billNumber}:`, err);
+  }
 }
 
 export async function saveUpdates(updates) {
