@@ -551,7 +551,7 @@ async function checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment,
 
     if (!bill || !bill.bill_status) {
       return;
-    }
+    }    
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -575,7 +575,7 @@ async function checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment,
         .execute();
 
       const action = result.dead ? 'DEAD' : 'ALIVE';
-      console.log(`[DEAD-BILL] ${billNumber}: ${action} — ${result.reason}`);
+      console.log(`[DEAD-BILL] ${billNumber}: ${action} — ${result.reason} - Deadline: ${result.failedDeadline}`);
     }
   } catch (err) {
     console.error(`[DEAD-BILL] Error checking dead status for ${billNumber}:`, err);
