@@ -5,11 +5,31 @@
 
 import type { ColumnType } from "kysely";
 
+export type AiMisclassification = "false_negative" | "false_positive";
+
+export type BillStatus = "conferenceAssigned" | "conferenceDeferred" | "conferencePassed" | "conferenceScheduled" | "crossoverDeferred1" | "crossoverDeferred2" | "crossoverDeferred3" | "crossoverScheduled1" | "crossoverScheduled2" | "crossoverScheduled3" | "crossoverWaiting1" | "crossoverWaiting2" | "crossoverWaiting3" | "deferred1" | "deferred2" | "deferred3" | "governorSigns" | "introduced" | "lawWithoutSignature" | "passedCommittees" | "scheduled1" | "scheduled2" | "scheduled3" | "transmittedGovernor" | "unassigned" | "vetoList" | "waiting2" | "waiting3";
+
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
   : ColumnType<T, T | undefined, T>;
 
 export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
+
+export type Json = JsonValue;
+
+export type JsonArray = JsonValue[];
+
+export type JsonObject = {
+  [x: string]: JsonValue | undefined;
+};
+
+export type JsonPrimitive = boolean | number | string | null;
+
+export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+
+export type OrgRole = "admin" | "worker";
+
+export type Sysrole = "sysadmin" | "user";
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
@@ -22,19 +42,24 @@ export interface AuthKey {
 }
 
 export interface Bills {
+  ai_misclassification_type: AiMisclassification | null;
+  ai_status: BillStatus | null;
+  archived: Generated<boolean>;
   bill_number: string | null;
+  bill_status: Generated<BillStatus | null>;
   bill_title: string | null;
   bill_url: string;
   committee_assignment: string | null;
   created_at: Generated<Timestamp | null>;
-  current_status: Generated<string | null>;
   current_status_string: string;
+  dead: Generated<boolean>;
   description: string;
   food_related: Generated<boolean | null>;
   id: Generated<string>;
   introducer: string | null;
   nickname: string | null;
   updated_at: Generated<Timestamp | null>;
+  year: number | null;
 }
 
 export interface BillTags {
@@ -42,6 +67,33 @@ export interface BillTags {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   tag_id: string;
+}
+
+export interface InviteTokens {
+  accepted_at: Timestamp | null;
+  created_at: Generated<Timestamp | null>;
+  email: string;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  invited_by: string;
+  status: Generated<string>;
+  tenant_id: string;
+  token: string;
+}
+
+export interface Members {
+  created_at: Generated<Timestamp | null>;
+  id: Generated<string>;
+  org_role: Generated<OrgRole>;
+  tenant_id: string;
+  user_id: string;
+}
+
+export interface OrgBills {
+  bill_id: string;
+  bill_status: Generated<BillStatus>;
+  tenant_id: string;
+  updated_at: Generated<Timestamp | null>;
 }
 
 export interface PendingProposals {
@@ -55,6 +107,7 @@ export interface PendingProposals {
   proposed_at: Generated<Timestamp>;
   proposed_by_user_id: string;
   proposed_status: string;
+  tenant_id: string | null;
 }
 
 export interface SchemaMigrations {
@@ -99,7 +152,16 @@ export interface Tags {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   name: string;
+  tenant_id: string | null;
   updated_at: Generated<Timestamp>;
+}
+
+export interface Tenants {
+  branding_config: Json | null;
+  created_at: Generated<Timestamp | null>;
+  id: Generated<string>;
+  name: string;
+  slug: string;
 }
 
 export interface User {
@@ -114,6 +176,7 @@ export interface User {
   requested_admin: Generated<boolean>;
   requested_supervisor: Generated<boolean | null>;
   role: Generated<string>;
+  system_role: Generated<Sysrole>;
   username: string;
   verification_token: string | null;
 }
@@ -131,6 +194,7 @@ export interface UserBills {
   adopted_at: Generated<Timestamp | null>;
   bill_id: string | null;
   id: Generated<string>;
+  tenant_id: string | null;
   user_id: string | null;
 }
 
@@ -138,6 +202,9 @@ export interface DB {
   auth_key: AuthKey;
   bill_tags: BillTags;
   bills: Bills;
+  invite_tokens: InviteTokens;
+  members: Members;
+  org_bills: OrgBills;
   pending_proposals: PendingProposals;
   schema_migrations: SchemaMigrations;
   scraping_stats: ScrapingStats;
@@ -145,6 +212,7 @@ export interface DB {
   status_updates: StatusUpdates;
   supervisor_users: SupervisorUsers;
   tags: Tags;
+  tenants: Tenants;
   user: User;
   user_bill_preferences: UserBillPreferences;
   user_bills: UserBills;
