@@ -206,6 +206,48 @@ export async function scrapeBills(url) {
   throw lastError;
 }
 
+/**
+ * Find an existing bill by its (bill_number, year) uniqueness constraint.
+ * Returns the bill's id, or null if no match exists.
+ * Shared by the scraper and the CSV upload endpoint so dedup stays consistent.
+ */
+export async function findExistingBillId(billNumber, year) {
+  const existing = await db
+    .selectFrom('bills')
+    .select('id')
+    .where('bill_number', '=', billNumber)
+    .where('year', '=', year)
+    .limit(1)
+    .executeTakeFirst();
+  return existing ? existing.id : null;
+}
+
+/**
+ * Insert a single cleaned bill with the minimal field set (no LLM
+ * classification). Returns the new bill's id.
+ * `current_status_string` is NOT NULL in the schema, so default to ''.
+ */
+export async function insertMinimalBill(bill) {
+  const inserted = await db
+    .insertInto('bills')
+    .values({
+      bill_url: bill.bill_url,
+      year: bill.year || null,
+      bill_number: bill.bill_number || null,
+      bill_title: bill.bill_title || null,
+      current_status_string: bill.current_status_string || '',
+      description: bill.description,
+      committee_assignment: bill.committee_assignment || null,
+      introducer: bill.introducer || null,
+      archived: false,
+      created_at: new Date(),
+      updated_at: new Date(),
+    })
+    .returning('id')
+    .executeTakeFirst();
+  return inserted.id;
+}
+
 // Save bills to the database
 export async function saveBills(bills) {
   if (!bills || bills.length === 0) {

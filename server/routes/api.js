@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import { main, saveBills, updateScrapingStats, scrapeIndividual } from '../services/scrapingService.js';
+import { main, saveBills, updateScrapingStats, scrapeIndividual, findExistingBillId, insertMinimalBill } from '../services/scrapingService.js';
 import { getAllBillsContext } from '../services/bills.js';
+import { cleanCsvRow, validateCleanedBill } from '../services/csvCleaner.js';
 import { db } from '../../db/kysely/client.js';
 import { sendAlertEmail } from '../services/alertService.js';
 const router = Router();
@@ -38,6 +39,126 @@ router.post('/save-bills', async (req, res) => {
     res.status(500).json({ 
       error: 'Failed to save bills',
       details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// POST /api/upload-csv - Clean, validate, dedup and (optionally) connect CSV bills
+//
+// Body: { rows: string[][], user_id?: string }
+//
+// Each row is a raw CSV row from the Hawaii Capitol export (cells may contain
+// HTML). Rows are cleaned (HTML stripped, real bill URL + fields extracted) and
+// validated before any DB write.
+//
+// Behaviour depends on the caller:
+//   - No user_id (scraper mode): dedup by (bill_number, year). Existing bills are
+//     skipped; new bills are inserted. No tracking connections are made.
+//   - user_id present (tracker mode): insert any bills not yet in the DB, then
+//     create the organization connection (org_bills row for the user's tenant)
+//     for every uploaded bill, so the org tracks them.
+router.post('/upload-csv', async (req, res) => {
+  try {
+    const { rows, user_id } = req.body;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'Invalid or empty rows data' });
+    }
+
+    // 1. Clean + validate every row.
+    const cleaned = [];
+    const invalidRows = [];
+    rows.forEach((row, index) => {
+      const bill = cleanCsvRow(row);
+      const { valid, errors } = validateCleanedBill(bill);
+      if (valid) {
+        cleaned.push(bill);
+      } else {
+        invalidRows.push({ index, errors });
+      }
+    });
+
+    // 2a. Scraper mode — dedup + insert, no tracking connections.
+    if (!user_id) {
+      let insertedBills = 0;
+      let duplicateBills = 0;
+      for (const bill of cleaned) {
+        const existingId = await findExistingBillId(bill.bill_number, bill.year);
+        if (existingId) {
+          duplicateBills++;
+        } else {
+          await insertMinimalBill(bill);
+          insertedBills++;
+        }
+      }
+      return res.json({
+        mode: 'scrape',
+        insertedBills,
+        duplicateBills,
+        invalidRows,
+      });
+    }
+
+    // 2b. Tracker mode — resolve the user's org, ensure bills exist, connect them.
+    const member = await db
+      .selectFrom('members')
+      .select('tenant_id')
+      .where('user_id', '=', user_id)
+      .executeTakeFirst();
+
+    if (!member) {
+      return res.status(400).json({ error: 'User is not a member of any organization' });
+    }
+    const tenantId = member.tenant_id;
+
+    let insertedBills = 0;
+    let existingBills = 0;
+    let connectionsCreated = 0;
+    let connectionsSkipped = 0;
+
+    for (const bill of cleaned) {
+      // Ensure the bill exists, capturing its id either way.
+      let billId = await findExistingBillId(bill.bill_number, bill.year);
+      if (billId) {
+        existingBills++;
+      } else {
+        billId = await insertMinimalBill(bill);
+        insertedBills++;
+      }
+
+      // Create the org connection if it doesn't already exist.
+      const existingConnection = await db
+        .selectFrom('org_bills')
+        .select('bill_id')
+        .where('tenant_id', '=', tenantId)
+        .where('bill_id', '=', billId)
+        .executeTakeFirst();
+
+      if (existingConnection) {
+        connectionsSkipped++;
+      } else {
+        await db
+          .insertInto('org_bills')
+          .values({ tenant_id: tenantId, bill_id: billId })
+          .execute();
+        connectionsCreated++;
+      }
+    }
+
+    return res.json({
+      mode: 'track',
+      tenant_id: tenantId,
+      insertedBills,
+      existingBills,
+      connectionsCreated,
+      connectionsSkipped,
+      invalidRows,
+    });
+  } catch (error) {
+    console.error('Error in upload-csv endpoint:', error);
+    res.status(500).json({
+      error: 'Failed to process CSV upload',
+      details: error instanceof Error ? error.message : 'Unknown error',
     });
   }
 });
