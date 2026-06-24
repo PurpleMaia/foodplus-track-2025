@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "cron:scrape": "node server/scrape-bills.js",
     "start": "node server/index.js",
-    "kysely-codegen": "kysely-codegen --dialect postgres --env-file ./.env --out-file db/generated.d.ts"
+    "kysely-codegen": "kysely-codegen --dialect postgres --env-file ./.env --out-file db/generated.d.ts",
+    "test": "node --test \"server/**/*.test.js\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",
