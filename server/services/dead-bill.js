@@ -1,6 +1,6 @@
 /* Utility functions for determining whether a bill is dead based on its status updates and deadlines. */
 
-import { COLUMN_INDEX } from './kanban-columns.js';
+import { COLUMN_INDEX } from '../kanban-columns.js';
 import sessionDeadlines from '../../session-deadlines-2026.json' with { type: 'json' };
 
 // --- Types (JSDoc) ---

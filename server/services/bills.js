@@ -1,3 +1,5 @@
+/* Bill fetching function for the frontend of this application (not bill-tracker) */
+
 import { db } from '../../db/kysely/client.js';
 const BILL_SELECT_FIELDS = [
   'id',

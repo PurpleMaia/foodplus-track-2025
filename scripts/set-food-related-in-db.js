@@ -2,7 +2,7 @@
 // DO NOT USE AFTER
 
 import { db } from '../db/kysely/client.js';
-import { determineIfFoodRelated } from './services/llm.js';
+import { determineIfFoodRelated } from '../server/services/llmService.js';
 
 const BATCH_SIZE = 4;
 const DELAY = 1000;

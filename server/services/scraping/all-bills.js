@@ -1,7 +1,7 @@
 import { db } from '../../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
-import { determineIfFoodRelated } from '../llm.js';
+import { determineIfFoodRelated } from '../llmService.js';
 import {
   getRandomUserAgent,
   delay,

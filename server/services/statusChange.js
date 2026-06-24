@@ -1,4 +1,4 @@
-import { COLUMN_TITLES } from './kanban-columns.js';
+import { COLUMN_TITLES } from '../kanban-columns.js';
 
 /**
  * Human-readable label for a bill_status enum id.
