@@ -10,7 +10,7 @@ import { sendBillUpdateEmail } from './alertService.js';
  */
 export function groupChangesByUser(followerRows) {
   const byUser = new Map();
-  for (const { user_id, email, change } of followerRows) {
+  for (const { user_id, email, change } of (followerRows ?? [])) {
     if (!byUser.has(user_id)) {
       byUser.set(user_id, { email, lines: [] });
     }
@@ -27,11 +27,27 @@ export function groupChangesByUser(followerRows) {
 }
 
 /**
+ * Default fetchFollowers implementation — queries user_bills ⋈ user for all
+ * followers of the given bill IDs.
+ * @param {string[]} billIds
+ * @returns {Promise<Array<{ bill_id: string, user_id: string, email: string }>>}
+ */
+async function defaultFetchFollowers(billIds) {
+  return db
+    .selectFrom('user_bills as ub')
+    .innerJoin('user as u', 'u.id', 'ub.user_id')
+    .where('ub.bill_id', 'in', billIds)
+    .select(['ub.bill_id as bill_id', 'u.id as user_id', 'u.email as email'])
+    .execute();
+}
+
+/**
  * Given the changes collected during a scrape run, email each follower a digest.
  * @param {Array<{ bill_id: string, bill_number: string, bill_title: string|null, old_status: string|null, new_status: string|null, old_dead: boolean|null, new_dead: boolean|null }>} changes
+ * @param {{ fetchFollowers?: (billIds: string[]) => Promise<Array<{ bill_id: string, user_id: string, email: string }>>, sendEmail?: (toEmail: string, lines: string[]) => Promise<void> }} [deps]
  * @returns {Promise<{ usersNotified: number, changesSent: number }>}
  */
-export async function sendStatusChangeNotifications(changes) {
+export async function sendStatusChangeNotifications(changes, { fetchFollowers = defaultFetchFollowers, sendEmail = sendBillUpdateEmail } = {}) {
   if (!changes || changes.length === 0) {
     console.log('[NOTIFY] No bill changes to notify');
     return { usersNotified: 0, changesSent: 0 };
@@ -39,12 +55,7 @@ export async function sendStatusChangeNotifications(changes) {
 
   // Look up every follower of every changed bill in one query.
   const billIds = [...new Set(changes.map(c => c.bill_id))];
-  const followers = await db
-    .selectFrom('user_bills as ub')
-    .innerJoin('user as u', 'u.id', 'ub.user_id')
-    .where('ub.bill_id', 'in', billIds)
-    .select(['ub.bill_id as bill_id', 'u.id as user_id', 'u.email as email'])
-    .execute();
+  const followers = await fetchFollowers(billIds);
 
   if (followers.length === 0) {
     console.log(`[NOTIFY] ${changes.length} change(s) but no followers — nothing to send`);
@@ -61,7 +72,7 @@ export async function sendStatusChangeNotifications(changes) {
 
   let usersNotified = 0;
   for (const { email, lines } of grouped.values()) {
-    await sendBillUpdateEmail(email, lines);
+    await sendEmail(email, lines);
     usersNotified++;
   }
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupChangesByUser } from './notificationService.js';
+import { groupChangesByUser, sendStatusChangeNotifications } from './notificationService.js';
 
 const change = (over) => ({
   bill_id: 'b1', bill_number: 'HB1', bill_title: 'One',
@@ -35,4 +35,105 @@ test('groupChangesByUser separates different users', () => {
 
 test('groupChangesByUser returns empty map for no rows', () => {
   assert.equal(groupChangesByUser([]).size, 0);
+});
+
+// ---------------------------------------------------------------------------
+// sendStatusChangeNotifications — orchestrator tests (injected fakes, no DB)
+// ---------------------------------------------------------------------------
+
+const mkChange = (over) => ({
+  bill_id: 'b1', bill_number: 'HB1', bill_title: 'One',
+  old_status: 'First Reading', new_status: 'Passed 2nd',
+  old_dead: false, new_dead: false, ...over,
+});
+
+test('sendStatusChangeNotifications: two followers of one bill each get an email', async () => {
+  const calls = [];
+  const fakeSend = async (email, lines) => calls.push({ email, lines });
+  const fakeFollowers = async () => [
+    { bill_id: 'b1', user_id: 'u1', email: 'u1@test.com' },
+    { bill_id: 'b1', user_id: 'u2', email: 'u2@test.com' },
+  ];
+
+  const result = await sendStatusChangeNotifications(
+    [mkChange({})],
+    { fetchFollowers: fakeFollowers, sendEmail: fakeSend },
+  );
+
+  assert.equal(calls.length, 2, 'sendEmail called once per user');
+  assert.equal(calls[0].email, 'u1@test.com');
+  assert.equal(calls[1].email, 'u2@test.com');
+  assert.equal(result.usersNotified, 2);
+  assert.equal(result.changesSent, 1);
+});
+
+test('sendStatusChangeNotifications: one user following two changed bills gets one email with 2 lines', async () => {
+  const calls = [];
+  const fakeSend = async (email, lines) => calls.push({ email, lines });
+  const fakeFollowers = async () => [
+    { bill_id: 'b1', user_id: 'u1', email: 'u1@test.com' },
+    { bill_id: 'b2', user_id: 'u1', email: 'u1@test.com' },
+  ];
+
+  const result = await sendStatusChangeNotifications(
+    [mkChange({ bill_id: 'b1', bill_number: 'HB1' }), mkChange({ bill_id: 'b2', bill_number: 'HB2' })],
+    { fetchFollowers: fakeFollowers, sendEmail: fakeSend },
+  );
+
+  assert.equal(calls.length, 1, 'only one email for one user');
+  assert.equal(calls[0].lines.length, 2, 'two lines in the digest');
+  assert.match(calls[0].lines[0], /HB1/);
+  assert.match(calls[0].lines[1], /HB2/);
+  assert.equal(result.usersNotified, 1);
+  assert.equal(result.changesSent, 2);
+});
+
+test('sendStatusChangeNotifications: follower with null email is filtered out', async () => {
+  const calls = [];
+  const fakeSend = async (email, lines) => calls.push({ email, lines });
+  const fakeFollowers = async () => [
+    { bill_id: 'b1', user_id: 'u1', email: null },
+    { bill_id: 'b1', user_id: 'u2', email: 'u2@test.com' },
+  ];
+
+  const result = await sendStatusChangeNotifications(
+    [mkChange({})],
+    { fetchFollowers: fakeFollowers, sendEmail: fakeSend },
+  );
+
+  assert.equal(calls.length, 1, 'null-email user not sent to');
+  assert.equal(calls[0].email, 'u2@test.com');
+  assert.equal(result.usersNotified, 1);
+});
+
+test('sendStatusChangeNotifications: empty changes → returns zeroes, no DB/email calls', async () => {
+  let fetchCalled = false;
+  let sendCalled = false;
+  const fakeFollowers = async () => { fetchCalled = true; return []; };
+  const fakeSend = async () => { sendCalled = true; };
+
+  const result = await sendStatusChangeNotifications(
+    [],
+    { fetchFollowers: fakeFollowers, sendEmail: fakeSend },
+  );
+
+  assert.equal(result.usersNotified, 0);
+  assert.equal(result.changesSent, 0);
+  assert.equal(fetchCalled, false, 'fetchFollowers must NOT be called for empty changes');
+  assert.equal(sendCalled, false, 'sendEmail must NOT be called for empty changes');
+});
+
+test('sendStatusChangeNotifications: changes present but no followers → no emails sent', async () => {
+  const calls = [];
+  const fakeSend = async (email, lines) => calls.push({ email, lines });
+  const fakeFollowers = async () => [];
+
+  const result = await sendStatusChangeNotifications(
+    [mkChange({})],
+    { fetchFollowers: fakeFollowers, sendEmail: fakeSend },
+  );
+
+  assert.equal(calls.length, 0, 'no emails when no followers');
+  assert.equal(result.usersNotified, 0);
+  assert.equal(result.changesSent, 1);
 });

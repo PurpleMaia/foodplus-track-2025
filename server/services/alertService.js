@@ -68,7 +68,7 @@ export async function sendBillUpdateEmail(toEmail, lines) {
     console.error('[NOTIFY] RESEND_API_KEY not set — skipping bill update email');
     return;
   }
-  if (!toEmail || lines.length === 0) {
+  if (!toEmail || !lines?.length) {
     return;
   }
 
