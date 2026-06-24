@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import { determineIfFoodRelated } from './llm.js';
 import { isBillDead } from './dead-bill.js';
 import sessionDeadlines from '../../session-deadlines-2026.json' with { type: 'json' };
+import { diffBillState } from './statusChange.js';
 
 // Flag to track if scraping should be cancelled
 let shouldCancelScraping = false;
@@ -30,6 +31,27 @@ const INDIVIDUAL_BATCH_SIZE = 5;
 const INDIVIDUAL_BATCH_DELAY = 2000; // 2s between batches
 const INDIVIDUAL_MAX_RETRIES = 3;
 const INDIVIDUAL_RETRY_DELAY = 3000; // 3s base delay, doubles each retry
+
+/**
+ * Build a plain status-change record, or null if nothing notifiable changed.
+ * Pure — no DB access — so it can be unit tested.
+ * `oldStatus`/`newStatus` are the bill's human-readable current_status_string values.
+ * @param {{ billId: string, billNumber: string, billTitle: string|null, oldStatus: string|null, newStatus: string|null, oldDead: boolean|null, newDead: boolean|null }} input
+ * @returns {null | { bill_id: string, bill_number: string, bill_title: string|null, old_status: string|null, new_status: string|null, old_dead: boolean|null, new_dead: boolean|null }}
+ */
+export function computeChange({ billId, billNumber, billTitle, oldStatus, newStatus, oldDead, newDead }) {
+  const { changed } = diffBillState({ oldStatus, newStatus, oldDead, newDead });
+  if (!changed) return null;
+  return {
+    bill_id: billId,
+    bill_number: billNumber,
+    bill_title: billTitle ?? null,
+    old_status: oldStatus ?? null,
+    new_status: newStatus ?? null,
+    old_dead: oldDead ?? null,
+    new_dead: newDead ?? null,
+  };
+}
 
 export async function main() {
     const currentYear = new Date().getFullYear();
@@ -65,6 +87,7 @@ export async function startScraping(url) {
   let individualSuccessCount = 0;
   let individualFailCount = 0;
   const individualFailures = []; // per-bill failure details for alerting
+  const statusChanges = []; // notifiable status/dead changes collected this run
 
   try {
     const bills = await scrapeBills(url);
@@ -89,7 +112,7 @@ export async function startScraping(url) {
       console.log(`[INDIVIDUAL] Batch ${batchNum}/${totalBatches} (bills ${i + 1}-${Math.min(i + INDIVIDUAL_BATCH_SIZE, billIds.length)})`)
 
       const batchResults = await Promise.allSettled(
-        batch.map(id => scrapeIndividual(id))
+        batch.map(id => scrapeIndividual(id, statusChanges))
       );
 
       for (let j = 0; j < batchResults.length; j++) {
@@ -121,7 +144,7 @@ export async function startScraping(url) {
     await updateScrapingStats(billIds.length, true, individualFailCount > 0 ? `${individualFailCount} individual scrape failures` : null);
 
     // Return bills, individual bill data, and failure details for alerting
-    return { bills, individualBillsData, individualFailCount, individualFailures, totalIndividual: billIds.length };
+    return { bills, individualBillsData, individualFailCount, individualFailures, totalIndividual: billIds.length, statusChanges };
   } catch (error) {
     console.error('Error during scraping:', error);
     const durationSec = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -354,7 +377,7 @@ export async function updateScrapingStats(billsSaved, success, errorMessage) {
 // Scrape individual bill 
 // const INDIVIDUAL_URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype=SB&billnumber=1186&year=2025'; // example endpoint: bills dataset
 
-export async function scrapeIndividual(billClassifier) {
+export async function scrapeIndividual(billClassifier, statusChanges = null) {
   console.log('[INDIVIDUAL] NEW CALL WITH CLASSIFIER: ', billClassifier)
 
   let newBill = false
@@ -493,20 +516,49 @@ export async function scrapeIndividual(billClassifier) {
       // save updates to database
       await saveUpdates(updates)
 
+      // Read the previously stored status BEFORE we overwrite it, so we can
+      // detect whether the scraped status differs from last run's value.
+      const priorRow = await db
+        .selectFrom('bills')
+        .select(['current_status_string', 'dead', 'bill_title'])
+        .where('id', '=', billID)
+        .executeTakeFirst();
+      const priorStatus = priorRow?.current_status_string ?? null;
+      const priorDead = priorRow?.dead ?? false;
+
       // save bill data if new amendments were made
       await db.updateTable('bills')
         .set({
           description: description,
           committee_assignment: committeeAssignment,
           introducer: introducers,
+          current_status_string: currentStatus,
           updated_at: new Date(),
         })
         .where('id', '=', billID)
         .execute();
       console.log('[INDIVIDUAL] Bill data updated', billID);
 
-      // check if the bill is dead after saving updates
-      await checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment, updates);
+      // check if the bill is dead after saving updates (returns whether dead flipped)
+      const deadResult = await checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment, updates);
+
+      // Record a notifiable change (status string differs, or dead flipped) for
+      // end-of-run follower notifications. Skipped for brand-new bills (no prior baseline).
+      if (statusChanges && priorRow) {
+        const change = computeChange({
+          billId: billID,
+          billNumber,
+          billTitle: billTitle,
+          oldStatus: priorStatus,
+          newStatus: currentStatus,
+          oldDead: priorDead,
+          newDead: deadResult.dead,
+        });
+        if (change) {
+          statusChanges.push(change);
+          console.log(`[NOTIFY] Change captured for ${billNumber}: "${change.old_status}" → "${change.new_status}", dead ${change.old_dead}→${change.new_dead}`);
+        }
+      }
 
       return billData;
     } catch (error) {
@@ -550,8 +602,8 @@ async function checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment,
       .executeTakeFirst();
 
     if (!bill || !bill.bill_status) {
-      return;
-    }    
+      return { dead: false, changed: false };
+    }
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -566,8 +618,11 @@ async function checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment,
       today,
     );
 
+    const wasDead = bill.dead ?? false;
+    const deadChanged = result.dead !== wasDead;
+
     // Only update if the dead flag changed
-    if (result.dead !== (bill.dead ?? false)) {
+    if (deadChanged) {
       await db
         .updateTable('bills')
         .set({ dead: result.dead })
@@ -577,8 +632,11 @@ async function checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment,
       const action = result.dead ? 'DEAD' : 'ALIVE';
       console.log(`[DEAD-BILL] ${billNumber}: ${action} — ${result.reason} - Deadline: ${result.failedDeadline}`);
     }
+
+    return { dead: result.dead, changed: deadChanged };
   } catch (err) {
     console.error(`[DEAD-BILL] Error checking dead status for ${billNumber}:`, err);
+    return { dead: false, changed: false };
   }
 }
 
