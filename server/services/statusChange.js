@@ -23,6 +23,27 @@ export function diffBillState({ oldStatus, newStatus, oldDead, newDead }) {
 }
 
 /**
+ * Build a plain status-change record, or null if nothing notifiable changed.
+ * Pure — no DB access — so it can be unit tested.
+ * `oldStatus`/`newStatus` are the bill's human-readable current_status_string values.
+ * @param {{ billId: string, billNumber: string, billTitle: string|null, oldStatus: string|null, newStatus: string|null, oldDead: boolean|null, newDead: boolean|null }} input
+ * @returns {null | { bill_id: string, bill_number: string, bill_title: string|null, old_status: string|null, new_status: string|null, old_dead: boolean|null, new_dead: boolean|null }}
+ */
+export function computeChange({ billId, billNumber, billTitle, oldStatus, newStatus, oldDead, newDead }) {
+  const { changed } = diffBillState({ oldStatus, newStatus, oldDead, newDead });
+  if (!changed) return null;
+  return {
+    bill_id: billId,
+    bill_number: billNumber,
+    bill_title: billTitle ?? null,
+    old_status: oldStatus ?? null,
+    new_status: newStatus ?? null,
+    old_dead: oldDead ?? null,
+    new_dead: newDead ?? null,
+  };
+}
+
+/**
  * One-line description of a change for a digest email.
  * @param {{ billNumber: string, billTitle: string|null, oldStatus: string|null, newStatus: string|null, oldDead: boolean|null, newDead: boolean|null }} input
  * @returns {string}

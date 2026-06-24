@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeChange } from './scrapingService.js';
+import { computeChange } from '../services/scrapingService.js';
 
 test('computeChange returns a record when status string changed', () => {
   const rec = computeChange({

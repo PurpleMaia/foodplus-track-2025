@@ -1,8 +1,9 @@
+/* Exclusive file function for cron job to call (same logic as main() in scrapingService.js) */
 import { startScraping } from './services/scrapingService.js';
 import { sendAlertEmail } from './services/alertService.js';
 import { sendStatusChangeNotifications } from './services/notificationService.js';
 
-async function main() {
+async function cronScrape() {
     const currentYear = new Date().getFullYear();
     console.log(`Starting cron job, scraping for year ${currentYear}...`);
 
@@ -11,29 +12,21 @@ async function main() {
 
     const errors = [];
 
+    // Scrape House bills URL
     console.log('[MAIN] Scraping House bills...');
-    const startTime = Date.now();
-
     const houseResult = await startScraping(houseURL);
+    console.log(`[MAIN] Finished scraping House bills in ${houseResult.durationMin} minutes.`);
 
-    const endTime = Date.now();
-    const duration = (endTime - startTime) / 1000 / 60;
-    console.log(`[MAIN] Finished scraping House bills in ${duration.toFixed(1)} minutes.`);
-
-    if (!houseResult?.bills?.length) {
+    if (!houseResult.totalBills) {
       errors.push(`House bills: 0 bills scraped from ${houseURL}`);
     }
 
+    // Scrape Senate bills URL
     console.log('[MAIN] Scraping Senate bills...');
-    const startTimeSenate = Date.now();
-
     const senateResult = await startScraping(senateURL);
+    console.log(`[MAIN] Finished scraping Senate bills in ${senateResult.durationMin} minutes.`);
 
-    const endTimeSenate = Date.now();
-    const durationSenate = (endTimeSenate - startTimeSenate) / 1000 / 60;
-    console.log(`[MAIN] Finished scraping Senate bills in ${durationSenate.toFixed(1)} minutes.`);
-
-    if (!senateResult?.bills?.length) {
+    if (!senateResult.totalBills) {
       errors.push(`Senate bills: 0 bills scraped from ${senateURL}`);
     }
 
@@ -48,6 +41,7 @@ async function main() {
       }
     }
 
+    // Send cron job alert email if there were any errors or individual failures
     if (errors.length > 0) {
       const body = [
         `Cron job completed at ${new Date().toISOString()} with issues:`,
@@ -55,8 +49,8 @@ async function main() {
         ...errors.map(e => `- ${e}`),
         '',
         `Year: ${currentYear}`,
-        `House bills scraped: ${houseResult?.bills?.length ?? 0}`,
-        `Senate bills scraped: ${senateResult?.bills?.length ?? 0}`,
+        `House bills scraped: ${houseResult.totalBills ?? 0}`,
+        `Senate bills scraped: ${senateResult.totalBills ?? 0}`,
       ];
 
       if (allIndividualFailures.length > 0) {
@@ -91,7 +85,7 @@ async function main() {
     }
 }
 
-main().catch(async (error) => {
+cronScrape().catch(async (error) => {
   console.error('Error during cron job scraping:', error);
 
   await sendAlertEmail('Cron job CRASHED', [

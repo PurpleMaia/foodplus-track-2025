@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const ALERT_EMAIL = process.env.ALERT_EMAIL || 'jaden.kapali@purplemaia.org';
+const ALERT_EMAIL = process.env.ALERT_EMAIL || 'data@purplemaia.org';
 const ALERT_FROM = process.env.ALERT_FROM || 'Food+ Alerts <onboarding@resend.dev>';
 
 /**

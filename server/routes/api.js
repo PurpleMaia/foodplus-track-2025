@@ -1,5 +1,7 @@
 import { Router } from 'express';
-import { main, saveBills, updateScrapingStats, scrapeIndividual } from '../services/scrapingService.js';
+import { main, updateScrapingStats } from '../services/scrapingService.js';
+import { saveBills } from '../services/scraping/all-bills.js';
+import { scrapeIndividual } from '../services/scraping/individual-bill.js';
 import { getAllBillsContext } from '../services/bills.js';
 import { db } from '../../db/kysely/client.js';
 import { sendAlertEmail } from '../services/alertService.js';

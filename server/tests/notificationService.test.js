@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupChangesByUser, sendStatusChangeNotifications } from './notificationService.js';
+import { groupChangesByUser, sendStatusChangeNotifications } from '../services/notificationService.js';
 
 const change = (over) => ({
   bill_id: 'b1', bill_number: 'HB1', bill_title: 'One',

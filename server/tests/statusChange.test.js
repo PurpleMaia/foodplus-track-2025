@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { statusLabel, diffBillState, describeChange } from './statusChange.js';
+import { statusLabel, diffBillState, describeChange } from '../services/statusChange.js';
 
 test('statusLabel maps known status to title', () => {
   assert.equal(statusLabel('passedCommittees'), 'CONFERENCE');

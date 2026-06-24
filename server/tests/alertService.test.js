@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBillUpdateBody } from './alertService.js';
+import { buildBillUpdateBody } from '../services/alertService.js';
 
 test('buildBillUpdateBody lists each change line', () => {
   const body = buildBillUpdateBody([
