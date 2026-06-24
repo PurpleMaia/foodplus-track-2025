@@ -457,7 +457,7 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
 
       // extract base metadata from the page
       const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
-      const currentStatus = $('#MainContent_ListView1_current_statusLabel_0').text().trim();
+      const currentStatus = $('#MainContent_ListView1_current_statusLabel_0').text().trim().replace(/\n\s*/g, ' ');
       const committeeAssignment = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
       const billTitle = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
       const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
@@ -536,15 +536,19 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
       const priorStatus = priorRow?.current_status_string ?? null;
       const priorDead = priorRow?.dead ?? false;
 
+      // Guard against a transient empty scrape overwriting the stored baseline.
+      const hasStatus = !!currentStatus && currentStatus.trim().length > 0;
+
       // save bill data if new amendments were made
+      const billUpdate = {
+        description: description,
+        committee_assignment: committeeAssignment,
+        introducer: introducers,
+        updated_at: new Date(),
+      };
+      if (hasStatus) billUpdate.current_status_string = currentStatus;
       await db.updateTable('bills')
-        .set({
-          description: description,
-          committee_assignment: committeeAssignment,
-          introducer: introducers,
-          current_status_string: currentStatus,
-          updated_at: new Date(),
-        })
+        .set(billUpdate)
         .where('id', '=', billID)
         .execute();
       console.log('[INDIVIDUAL] Bill data updated', billID);
@@ -554,7 +558,7 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
 
       // Record a notifiable change (status string differs, or dead flipped) for
       // end-of-run follower notifications. Skipped for brand-new bills (no prior baseline).
-      if (statusChanges && priorRow && !isNewBill) {
+      if (statusChanges && priorRow && !isNewBill && hasStatus) {
         const change = computeChange({
           billId: billID,
           billNumber,
