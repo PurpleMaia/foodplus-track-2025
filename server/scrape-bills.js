@@ -1,5 +1,6 @@
 import { startScraping } from './services/scrapingService.js';
 import { sendAlertEmail } from './services/alertService.js';
+import { sendStatusChangeNotifications } from './services/notificationService.js';
 
 async function main() {
     const currentYear = new Date().getFullYear();
@@ -66,6 +67,27 @@ async function main() {
       }
 
       await sendAlertEmail('Scraping completed with failures', body.join('\n'));
+    }
+
+    // Notify followers of any bill status / dead changes detected this run.
+    // Merge changes collected across both chambers. Wrapped so a notification
+    // failure never fails the scrape.
+    try {
+      const allChanges = [
+        ...(houseResult?.statusChanges || []),
+        ...(senateResult?.statusChanges || []),
+      ];
+      const { usersNotified, changesSent } = await sendStatusChangeNotifications(allChanges);
+      console.log(`[MAIN] Notifications: ${usersNotified} user(s), ${changesSent} change(s)`);
+    } catch (notifyErr) {
+      console.error('[MAIN] Notification dispatch failed:', notifyErr);
+      await sendAlertEmail('Bill notification dispatch failed', [
+        `The follower notification step failed at ${new Date().toISOString()}.`,
+        '',
+        `Error: ${notifyErr?.message || notifyErr}`,
+        '',
+        notifyErr?.stack || 'No stack trace available',
+      ].join('\n'));
     }
 }
 
