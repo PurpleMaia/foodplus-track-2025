@@ -39,3 +39,13 @@ test('computeChange treats first-seen (null old) status as a change only if new 
   assert.ok(computeChange({ billId: 'b1', billNumber: 'HB1', billTitle: null, oldStatus: null, newStatus: 'Introduced', oldDead: false, newDead: false }));
   assert.equal(computeChange({ billId: 'b1', billNumber: 'HB1', billTitle: null, oldStatus: null, newStatus: null, oldDead: false, newDead: false }), null);
 });
+
+test('computeChange preserves bill_title in the returned record', () => {
+  const rec = computeChange({
+    billId: 'b1', billNumber: 'HB1', billTitle: 'Relating to Food Safety',
+    oldStatus: null, newStatus: 'Introduced',
+    oldDead: false, newDead: false,
+  });
+  assert.ok(rec);
+  assert.equal(rec.bill_title, 'Relating to Food Safety');
+});

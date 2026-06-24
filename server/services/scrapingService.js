@@ -94,7 +94,8 @@ export async function startScraping(url) {
     billCount = bills.length;
 
     // return bill ids for scraping individual bills
-    const billIds = await saveBills(bills);
+    const { billIds, newBillIds } = await saveBills(bills);
+    const newBillIdSet = new Set(newBillIds); // for O(1) brand-new bill lookup
 
     // Scrape individual bills in batches for concurrency
     const individualBillsData = [];
@@ -112,7 +113,7 @@ export async function startScraping(url) {
       console.log(`[INDIVIDUAL] Batch ${batchNum}/${totalBatches} (bills ${i + 1}-${Math.min(i + INDIVIDUAL_BATCH_SIZE, billIds.length)})`)
 
       const batchResults = await Promise.allSettled(
-        batch.map(id => scrapeIndividual(id, statusChanges))
+        batch.map(id => scrapeIndividual(id, statusChanges, newBillIdSet.has(id)))
       );
 
       for (let j = 0; j < batchResults.length; j++) {
@@ -233,7 +234,7 @@ export async function scrapeBills(url) {
 export async function saveBills(bills) {
   if (!bills || bills.length === 0) {
     console.log('No bills to save');
-    return 0;
+    return { billIds: [], newBillIds: [] };
   }
   console.log(`[SAVE] Saving ${bills.length} bills to database...`);
   
@@ -242,6 +243,7 @@ export async function saveBills(bills) {
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   let billIds = [];
+  let newBillIds = []; // ids of bills inserted this run (brand-new)
   const newBills = [];
 
   // First pass: find existing bills, collect new bills
@@ -337,9 +339,11 @@ export async function saveBills(bills) {
         }
       });
 
-      // Append the bill IDs from this batch
+      // Append the bill IDs from this batch (new bills only)
       const results = await Promise.all(batchPromises);
-      billIds.push(...results.filter(id => id !== null));
+      const validIds = results.filter(id => id !== null);
+      billIds.push(...validIds);
+      newBillIds.push(...validIds); // track newly-inserted ids for brand-new bill suppression
 
       console.log(`[SAVE] Completed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(newBills.length / BATCH_SIZE)}`);
 
@@ -350,7 +354,7 @@ export async function saveBills(bills) {
     }
   }
 
-  return billIds;
+  return { billIds, newBillIds };
 }
 
 // Update scraping statistics
@@ -377,7 +381,7 @@ export async function updateScrapingStats(billsSaved, success, errorMessage) {
 // Scrape individual bill 
 // const INDIVIDUAL_URL = 'https://data.capitol.hawaii.gov/session/measure_indiv.aspx?billtype=SB&billnumber=1186&year=2025'; // example endpoint: bills dataset
 
-export async function scrapeIndividual(billClassifier, statusChanges = null) {
+export async function scrapeIndividual(billClassifier, statusChanges = null, isNewBill = false) {
   console.log('[INDIVIDUAL] NEW CALL WITH CLASSIFIER: ', billClassifier)
 
   let newBill = false
@@ -518,11 +522,17 @@ export async function scrapeIndividual(billClassifier, statusChanges = null) {
 
       // Read the previously stored status BEFORE we overwrite it, so we can
       // detect whether the scraped status differs from last run's value.
-      const priorRow = await db
-        .selectFrom('bills')
-        .select(['current_status_string', 'dead', 'bill_title'])
-        .where('id', '=', billID)
-        .executeTakeFirst();
+      // Isolated try/catch: a DB hiccup here must not fail the HTTP scrape.
+      let priorRow = null;
+      try {
+        priorRow = await db
+          .selectFrom('bills')
+          .select(['current_status_string', 'dead', 'bill_title'])
+          .where('id', '=', billID)
+          .executeTakeFirst();
+      } catch (err) {
+        console.error(`[NOTIFY] Could not read prior status for ${billNumber}:`, err?.message || err);
+      }
       const priorStatus = priorRow?.current_status_string ?? null;
       const priorDead = priorRow?.dead ?? false;
 
@@ -544,7 +554,7 @@ export async function scrapeIndividual(billClassifier, statusChanges = null) {
 
       // Record a notifiable change (status string differs, or dead flipped) for
       // end-of-run follower notifications. Skipped for brand-new bills (no prior baseline).
-      if (statusChanges && priorRow) {
+      if (statusChanges && priorRow && !isNewBill) {
         const change = computeChange({
           billId: billID,
           billNumber,

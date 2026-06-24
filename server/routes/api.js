@@ -31,8 +31,8 @@ router.post('/save-bills', async (req, res) => {
       return res.status(400).json({ error: 'Invalid bills data' });
     }
     
-    const successCount = await saveBills(bills);
-    res.json({ successCount });
+    const { billIds } = await saveBills(bills);
+    res.json({ successCount: billIds.length });
   } catch (error) {
     console.error('Error in save-bills endpoint:', error);
     res.status(500).json({ 
