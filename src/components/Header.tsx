@@ -1,9 +1,11 @@
 import React from 'react';
-import { FileText, BarChart2, Settings, Table } from 'lucide-react';
+import { FileText, BarChart2, Settings, Table, FlaskConical } from 'lucide-react';
+
+type Tab = 'dashboard' | 'bills' | 'spreadsheet' | 'controls' | 'test';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'bills' | 'spreadsheet' | 'controls';
-  setActiveTab: (tab: 'dashboard' | 'bills' | 'spreadsheet' | 'controls') => void;
+  activeTab: Tab;
+  setActiveTab: (tab: Tab) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
@@ -39,6 +41,18 @@ const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             >
               <Settings className="w-5 h-5 mr-2" />
               Controls
+            </button>
+
+            <button
+              onClick={() => setActiveTab('test')}
+              className={`flex items-center px-4 py-2 rounded-md transition-all ${
+                activeTab === 'test'
+                  ? 'bg-amber-500 text-white'
+                  : 'text-white/80 hover:bg-blue-700'
+              }`}
+            >
+              <FlaskConical className="w-5 h-5 mr-2" />
+              Test
             </button>
           </nav>
         </div>

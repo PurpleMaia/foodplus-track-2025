@@ -1,0 +1,24 @@
+{
+  "id": "sb-introduced-to-scheduled1",
+  "label": "SB pre-crossover: introduced → scheduled1 (first hearing scheduled)",
+  "billNumber": "SB1234",
+  "committeeAssignment": "AGR, ECD, FIN",
+  "before": {
+    "expected": "introduced",
+    "statusLog": [
+      ["3/4/2025", "S", "Referred to AGR, ECD, FIN, referral sheet 18"],
+      ["1/21/2025", "S", "Pass First Reading"],
+      ["1/17/2025", "S", "Introduced and Pass First Reading."]
+    ]
+  },
+  "after": {
+    "expected": "scheduled1",
+    "newUpdate": ["3/5/2025", "S", "Bill scheduled to be heard by AGR on Friday, 03-07-25 10:30AM in conference room 325."],
+    "statusLog": [
+      ["3/5/2025", "S", "Bill scheduled to be heard by AGR on Friday, 03-07-25 10:30AM in conference room 325."],
+      ["3/4/2025", "S", "Referred to AGR, ECD, FIN, referral sheet 18"],
+      ["1/21/2025", "S", "Pass First Reading"],
+      ["1/17/2025", "S", "Introduced and Pass First Reading."]
+    ]
+  }
+}

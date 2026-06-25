@@ -1,0 +1,26 @@
+{
+  "id": "hb-transmitted-to-governorsigns",
+  "label": "HB late-stage: transmittedGovernor → governorSigns (Act number appears)",
+  "billNumber": "HB1099",
+  "committeeAssignment": "AGR, ECD, FIN",
+  "before": {
+    "expected": "transmittedGovernor",
+    "statusLog": [
+      ["5/2/2025", "S", "Enrolled to Governor."],
+      ["5/2/2025", "S", "Received notice of passage on Final Reading in House (Hse. Com. No. 821)."],
+      ["4/30/2025", "H", "Passed Final Reading as amended in CD 1."],
+      ["4/30/2025", "S", "Passed Final Reading, as amended (CD 1)."]
+    ]
+  },
+  "after": {
+    "expected": "governorSigns",
+    "newUpdate": ["5/14/2025", "S", "Act 048, on 05/14/2025 (Gov. Msg. No. 1148)."],
+    "statusLog": [
+      ["5/14/2025", "S", "Act 048, on 05/14/2025 (Gov. Msg. No. 1148)."],
+      ["5/2/2025", "S", "Enrolled to Governor."],
+      ["5/2/2025", "S", "Received notice of passage on Final Reading in House (Hse. Com. No. 821)."],
+      ["4/30/2025", "H", "Passed Final Reading as amended in CD 1."],
+      ["4/30/2025", "S", "Passed Final Reading, as amended (CD 1)."]
+    ]
+  }
+}

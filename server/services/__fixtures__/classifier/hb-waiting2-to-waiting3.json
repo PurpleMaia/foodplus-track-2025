@@ -1,0 +1,29 @@
+{
+  "id": "hb-waiting2-to-waiting3",
+  "label": "HB pre-crossover: waiting2 → waiting3 (ECD passes, referred to FIN)",
+  "billNumber": "HB1060",
+  "committeeAssignment": "AGR, ECD, FIN",
+  "before": {
+    "expected": "waiting2",
+    "statusLog": [
+      ["3/11/2025", "H", "Passed Second Reading as amended in HD 1 and referred to the committee(s) on ECD with none voting aye with reservations; none voting no (0)."],
+      ["3/11/2025", "H", "Reported from AGR (Stand. Com. Rep. No. 1175) as amended in HD 1, recommending passage on Second Reading and referral to ECD."],
+      ["3/7/2025", "H", "The committee on AGR recommend that the measure be PASSED, WITH AMENDMENTS."],
+      ["3/5/2025", "H", "Bill scheduled to be heard by AGR on Friday, 03-07-25 10:30AM in House conference room 325."],
+      ["3/4/2025", "H", "Referred to AGR, ECD, FIN, referral sheet 18"],
+      ["2/28/2025", "H", "Pass First Reading"]
+    ]
+  },
+  "after": {
+    "expected": "waiting3",
+    "newUpdate": ["3/21/2025", "H", "Report adopted; referred to the committee(s) on FIN as amended in HD 2."],
+    "statusLog": [
+      ["3/21/2025", "H", "Report adopted; referred to the committee(s) on FIN as amended in HD 2."],
+      ["3/21/2025", "H", "Reported from ECD (Stand. Com. Rep. No. 1445) as amended in HD 2, recommending referral to FIN."],
+      ["3/19/2025", "H", "The committee on ECD recommend that the measure be PASSED, WITH AMENDMENTS."],
+      ["3/14/2025", "H", "Bill scheduled to be heard by ECD on Wednesday, 03-19-25 10:00AM in House conference room 423."],
+      ["3/11/2025", "H", "Passed Second Reading as amended in HD 1 and referred to the committee(s) on ECD."],
+      ["3/4/2025", "H", "Referred to AGR, ECD, FIN, referral sheet 18"]
+    ]
+  }
+}

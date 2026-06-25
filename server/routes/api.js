@@ -4,7 +4,9 @@ import { saveBills } from '../services/scraping/all-bills.js';
 import { scrapeIndividual } from '../services/scraping/individual-bill.js';
 import { getAllBillsContext } from '../services/bills.js';
 import { db } from '../../db/kysely/client.js';
-import { sendAlertEmail } from '../services/alertService.js';
+import { sendAlertEmail } from '../services/notifications/cron-alerts.js';
+import { listFixtures } from '../services/__fixtures__/classifier/index.js';
+import { seedBefore, injectAfter, resetHarness } from '../services/classifierTestService.js';
 const router = Router();
 
 // GET /api/scrape-bills - Start scraping process
@@ -134,6 +136,59 @@ router.get('/all-bills-context', async (req, res) => {
       error: 'Failed to get bills context',
       details: error instanceof Error ? error.message : 'Unknown error'
     });
+  }
+});
+
+// ── Classifier test/debug harness ──────────────────────────────────────────
+// Deterministic before→after experiment against classifyStatusWithLLM using curated
+// fixtures, plus the change→notification email path. Operates only on throwaway
+// test:// bill rows — see classifierTestService.js.
+
+// GET /api/classifier-test/fixtures - list available fixtures for the dropdown
+router.get('/classifier-test/fixtures', async (req, res) => {
+  try {
+    res.json({ fixtures: listFixtures() });
+  } catch (error) {
+    console.error('Error in classifier-test/fixtures endpoint:', error);
+    res.status(500).json({ error: 'Failed to list fixtures', details: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
+// POST /api/classifier-test/seed-before - seed "before" state and classify
+router.post('/classifier-test/seed-before', async (req, res) => {
+  try {
+    const { fixtureId } = req.body;
+    if (!fixtureId) return res.status(400).json({ error: 'fixtureId is required' });
+    const result = await seedBefore(fixtureId);
+    res.json(result);
+  } catch (error) {
+    console.error('Error in classifier-test/seed-before endpoint:', error);
+    res.status(500).json({ error: 'Failed to seed before state', details: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
+// POST /api/classifier-test/inject-after - inject new update, re-classify, send notification
+router.post('/classifier-test/inject-after', async (req, res) => {
+  try {
+    const { fixtureId, email } = req.body;
+    if (!fixtureId) return res.status(400).json({ error: 'fixtureId is required' });
+    const result = await injectAfter(fixtureId, email);
+    res.json(result);
+  } catch (error) {
+    console.error('Error in classifier-test/inject-after endpoint:', error);
+    res.status(500).json({ error: 'Failed to inject after state', details: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
+// POST /api/classifier-test/reset - delete throwaway harness bill(s)
+router.post('/classifier-test/reset', async (req, res) => {
+  try {
+    const { fixtureId } = req.body || {};
+    const result = await resetHarness(fixtureId);
+    res.json(result);
+  } catch (error) {
+    console.error('Error in classifier-test/reset endpoint:', error);
+    res.status(500).json({ error: 'Failed to reset harness', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 
