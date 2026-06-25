@@ -27,16 +27,24 @@ const FIXTURES = loadFixtures();
 
 /**
  * Summaries for the frontend dropdown — id, label, and the expected enum for each step.
- * @returns {Array<{ id: string, label: string, billNumber: string, beforeExpected: string, afterExpected: string }>}
+ * `label` is derived for display (bill number + title + transition); fixtures store a real
+ * `billTitle` rather than a descriptive label.
+ * @returns {Array<{ id: string, label: string, billNumber: string, billTitle: string, beforeExpected: string, afterExpected: string }>}
  */
 export function listFixtures() {
-  return [...FIXTURES.values()].map(f => ({
-    id: f.id,
-    label: f.label,
-    billNumber: f.billNumber,
-    beforeExpected: f.before?.expected ?? null,
-    afterExpected: f.after?.expected ?? null,
-  }));
+  return [...FIXTURES.values()].map(f => {
+    const beforeExpected = f.before?.expected ?? null;
+    const afterExpected = f.after?.expected ?? null;
+    const titlePart = f.billTitle ? ` · ${f.billTitle}` : '';
+    return {
+      id: f.id,
+      label: `${f.billNumber}${titlePart} (${beforeExpected} → ${afterExpected})`,
+      billNumber: f.billNumber,
+      billTitle: f.billTitle ?? null,
+      beforeExpected,
+      afterExpected,
+    };
+  });
 }
 
 /**

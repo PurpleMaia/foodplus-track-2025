@@ -21,6 +21,10 @@ test('groupChangesByUser groups multiple bills under one user', () => {
   assert.match(u1.lines[0], /HB1/);
   assert.match(u1.lines[1], /HB2/);
   assert.match(u1.lines[1], /DEAD/);
+  // structured changes are carried alongside the text lines (for HTML rendering)
+  assert.equal(u1.changes.length, 2);
+  assert.equal(u1.changes[0].bill_number, 'HB1');
+  assert.equal(u1.changes[1].bill_number, 'HB2');
 });
 
 test('groupChangesByUser separates different users', () => {
@@ -49,7 +53,7 @@ const mkChange = (over) => ({
 
 test('sendStatusChangeNotifications: two followers of one bill each get an email', async () => {
   const calls = [];
-  const fakeSend = async (email, lines) => calls.push({ email, lines });
+  const fakeSend = async (email, lines, changes) => calls.push({ email, lines, changes });
   const fakeFollowers = async () => [
     { bill_id: 'b1', user_id: 'u1', email: 'u1@test.com' },
     { bill_id: 'b1', user_id: 'u2', email: 'u2@test.com' },
@@ -63,6 +67,8 @@ test('sendStatusChangeNotifications: two followers of one bill each get an email
   assert.equal(calls.length, 2, 'sendEmail called once per user');
   assert.equal(calls[0].email, 'u1@test.com');
   assert.equal(calls[1].email, 'u2@test.com');
+  assert.equal(calls[0].changes.length, 1, 'sendEmail receives structured changes');
+  assert.equal(calls[0].changes[0].bill_number, 'HB1');
   assert.equal(result.usersNotified, 2);
   assert.equal(result.changesSent, 1);
 });

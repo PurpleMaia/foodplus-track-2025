@@ -6,15 +6,16 @@ import { sendBillUpdateEmail } from './notifications/bill-updates-digest.js';
  * Group follower rows into one entry per user, building digest lines.
  * Pure — no DB access.
  * @param {Array<{ user_id: string, email: string, change: { bill_number: string, bill_title: string|null, old_status: string|null, new_status: string|null, old_dead: boolean|null, new_dead: boolean|null } }>} followerRows
- * @returns {Map<string, { email: string, lines: string[] }>}
+ * @returns {Map<string, { email: string, lines: string[], changes: object[] }>}
  */
 export function groupChangesByUser(followerRows) {
   const byUser = new Map();
   for (const { user_id, email, change } of (followerRows ?? [])) {
     if (!byUser.has(user_id)) {
-      byUser.set(user_id, { email, lines: [] });
+      byUser.set(user_id, { email, lines: [], changes: [] });
     }
-    byUser.get(user_id).lines.push(describeChange({
+    const entry = byUser.get(user_id);
+    entry.lines.push(describeChange({
       billNumber: change.bill_number,
       billTitle: change.bill_title,
       oldStatus: change.old_status,
@@ -22,6 +23,7 @@ export function groupChangesByUser(followerRows) {
       oldDead: change.old_dead,
       newDead: change.new_dead,
     }));
+    entry.changes.push(change);
   }
   return byUser;
 }
@@ -44,7 +46,7 @@ async function defaultFetchFollowers(billIds) {
 /**
  * Given the changes collected during a scrape run, email each follower a digest.
  * @param {Array<{ bill_id: string, bill_number: string, bill_title: string|null, old_status: string|null, new_status: string|null, old_dead: boolean|null, new_dead: boolean|null }>} changes
- * @param {{ fetchFollowers?: (billIds: string[]) => Promise<Array<{ bill_id: string, user_id: string, email: string }>>, sendEmail?: (toEmail: string, lines: string[]) => Promise<void> }} [deps]
+ * @param {{ fetchFollowers?: (billIds: string[]) => Promise<Array<{ bill_id: string, user_id: string, email: string }>>, sendEmail?: (toEmail: string, lines: string[], changes: object[]) => Promise<void> }} [deps]
  * @returns {Promise<{ usersNotified: number, changesSent: number }>}
  */
 export async function sendStatusChangeNotifications(changes, { fetchFollowers = defaultFetchFollowers, sendEmail = sendBillUpdateEmail } = {}) {
@@ -71,8 +73,8 @@ export async function sendStatusChangeNotifications(changes, { fetchFollowers = 
   const grouped = groupChangesByUser(followerRows);
 
   let usersNotified = 0;
-  for (const { email, lines } of grouped.values()) {
-    await sendEmail(email, lines);
+  for (const { email, lines, changes: userChanges } of grouped.values()) {
+    await sendEmail(email, lines, userChanges);
     usersNotified++;
   }
 
