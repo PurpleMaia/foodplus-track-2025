@@ -52,7 +52,7 @@ export async function seedBefore(fixtureId) {
   const billValues = {
     bill_number: fixture.billNumber,
     committee_assignment: fixture.committeeAssignment,
-    bill_title: fixture.label,
+    bill_title: fixture.billTitle ?? null,
     description: 'classifier test harness',
     current_status_string: newestText(before.statusLog),
     bill_status: null,
@@ -146,7 +146,7 @@ export async function injectAfter(fixtureId, email) {
       oldDead: false,
       newDead: false,
     });
-    emailResult = await sendNotification(email, [line]);
+    emailResult = await sendNotification(email, [line], [change]);
   }
 
   return {
@@ -165,17 +165,18 @@ export async function injectAfter(fixtureId, email) {
  * Send the bill-update email, reporting a clear outcome string for the UI.
  * Wraps sendBillUpdateEmail (which is fire-and-forget / void) so the harness can surface status.
  * @param {string} email
- * @param {string[]} lines
+ * @param {string[]} lines text fallback lines
+ * @param {Array<object>} [changes] structured change records for the branded HTML body
  * @returns {Promise<string>}
  */
-async function sendNotification(email, lines) {
+async function sendNotification(email, lines, changes) {
   if (!process.env.RESEND_API_KEY) {
     return 'skipped (RESEND_API_KEY not set)';
   }
   if (!email) {
     return 'skipped (no email provided)';
   }
-  await sendBillUpdateEmail(email, lines);
+  await sendBillUpdateEmail(email, lines, changes);
   return `sent to ${email}`;
 }
 
