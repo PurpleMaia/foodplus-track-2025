@@ -1,6 +1,6 @@
 /* Exclusive file function for cron job to call (same logic as main() in scrapingService.js) */
 import { startScraping } from './services/scrapingService.js';
-import { sendAlertEmail } from './services/alertService.js';
+import { sendAlertEmail } from './services/notifications/cron-alerts.js';
 import { sendStatusChangeNotifications } from './services/notificationService.js';
 
 async function cronScrape() {

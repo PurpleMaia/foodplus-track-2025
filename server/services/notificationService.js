@@ -1,6 +1,6 @@
 import { db } from '../../db/kysely/client.js';
 import { describeChange } from './statusChange.js';
-import { sendBillUpdateEmail } from './bill-updates-digest.js';
+import { sendBillUpdateEmail } from './notifications/bill-updates-digest.js';
 
 /**
  * Group follower rows into one entry per user, building digest lines.
