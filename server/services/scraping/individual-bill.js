@@ -3,6 +3,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { checkAndUpdateDeadStatus } from '../dead-bill.js';
 import { computeChange } from '../statusChange.js';
+import { classifyStatusWithLLM } from '../statusClassifierService.js';
 import {
   getRandomUserAgent,
   delay,
@@ -18,6 +19,7 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
   console.log('[INDIVIDUAL] NEW CALL WITH CLASSIFIER: ', billClassifier)
 
   let newBill = false
+  let insertedNewBill = false // true once the URL-path insert created a brand-new bills row
   let url, billID
   const urlPattern = /^https?:\/\//i;
   if (urlPattern.test(billClassifier)) {
@@ -115,6 +117,7 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
         console.log('[INDIVIDUAL] New bill inserted with ID:', newBillId.id)
         billID = newBillId.id
         newBill = false; // only insert once even if we somehow retry past this point
+        insertedNewBill = true; // ensure bill_status gets classified below
       }
 
       // extract status updates
@@ -204,6 +207,28 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
         if (change) {
           statusChanges.push(change);
           console.log(`[NOTIFY] Change captured for ${billNumber}: "${change.old_status}" → "${change.new_status}", dead ${change.old_dead}→${change.new_dead}`);
+        }
+      }
+
+      // AI-derive the kanban bill_status when the status changed or this is a brand-new bill.
+      // Runs after updates + bill row are persisted (the classifier reads status_updates and
+      // the bills row). Isolated try/catch: an LLM failure must not fail the HTTP scrape.
+      const isBrandNew = isNewBill || insertedNewBill;
+      if (hasStatus && (isBrandNew || priorStatus !== currentStatus)) {
+        try {
+          console.log(`[STATUS-AI] Status changed for ${billNumber} (new=${isBrandNew}); classifying...`);
+          const newBillStatus = await classifyStatusWithLLM(billID);
+          if (newBillStatus) {
+            await db.updateTable('bills')
+              .set({ bill_status: newBillStatus })
+              .where('id', '=', billID)
+              .execute();
+            console.log(`[STATUS-AI] ${billNumber} bill_status set to "${newBillStatus}"`);
+          } else {
+            console.warn(`[STATUS-AI] ${billNumber}: no usable classification, bill_status left unchanged`);
+          }
+        } catch (err) {
+          console.error(`[STATUS-AI] Failed to classify bill_status for ${billNumber}:`, err?.message || err);
         }
       }
 
