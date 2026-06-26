@@ -2,6 +2,7 @@
 import { startScraping } from './services/scrapingService.js';
 import { sendAlertEmail } from './services/notifications/cron-alerts.js';
 import { sendStatusChangeNotifications } from './services/notificationService.js';
+import { checkApproachingDeadlines, sendDeadlineWarnings } from './services/notifications/deadline-warnings.js';
 
 async function cronScrape() {
     const currentYear = new Date().getFullYear();
@@ -81,6 +82,25 @@ async function cronScrape() {
         `Error: ${notifyErr?.message || notifyErr}`,
         '',
         notifyErr?.stack || 'No stack trace available',
+      ].join('\n'));
+    }
+
+    // Warn followers of bills approaching a legislative deadline (7-day heads-up,
+    // 3-day urgent). Runs on the fresh bill_status data this scrape just persisted.
+    // Wrapped so a failure never fails the scrape.
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const warnings = await checkApproachingDeadlines(today);
+      const { usersNotified } = await sendDeadlineWarnings(warnings);
+      console.log(`[MAIN] Deadline warnings: ${usersNotified} user(s), ${warnings.length} bill(s)`);
+    } catch (deadlineErr) {
+      console.error('[MAIN] Deadline warning dispatch failed:', deadlineErr);
+      await sendAlertEmail('Deadline warning dispatch failed', [
+        `The deadline warning step failed at ${new Date().toISOString()}.`,
+        '',
+        `Error: ${deadlineErr?.message || deadlineErr}`,
+        '',
+        deadlineErr?.stack || 'No stack trace available',
       ].join('\n'));
     }
 }

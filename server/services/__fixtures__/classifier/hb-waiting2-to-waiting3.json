@@ -3,6 +3,10 @@
   "billTitle": "RELATING TO FOOD SECURITY",
   "billNumber": "HB1060",
   "committeeAssignment": "AGR, ECD, FIN",
+  "deadline": {
+    "name": "First Lateral",
+    "date": "2026-02-20"
+  },
   "before": {
     "expected": "waiting2",
     "statusLog": [

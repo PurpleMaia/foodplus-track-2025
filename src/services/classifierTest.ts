@@ -58,5 +58,25 @@ export const seedBefore = (fixtureId: string): Promise<StepResult> =>
 export const injectAfter = (fixtureId: string, email: string): Promise<StepResult> =>
   postJson('/api/classifier-test/inject-after', { fixtureId, email });
 
+export interface DeadlineWarnResult {
+  fixtureId: string;
+  billId: string;
+  today: string;
+  nextDeadlineName: string | null;
+  nextDeadlineDate: string | null;
+  daysLeft: number | null;
+  tier: '7' | '3' | null;
+  dead: boolean;
+  deadlinePassed: boolean;
+  emailResult: string;
+}
+
+export const deadlineWarn = (
+  fixtureId: string,
+  email: string,
+  today?: string,
+): Promise<DeadlineWarnResult> =>
+  postJson('/api/classifier-test/deadline-warn', { fixtureId, email, today: today || undefined });
+
 export const resetHarness = (fixtureId?: string): Promise<{ deleted: number }> =>
   postJson('/api/classifier-test/reset', { fixtureId });

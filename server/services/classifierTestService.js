@@ -1,7 +1,8 @@
 import { db } from '../../db/kysely/client.js';
 import { classifyStatusWithDebug } from './statusClassifierService.js';
 import { computeChange, describeChange } from './statusChange.js';
-import { sendBillUpdateEmail } from './notifications/bill-updates-digest.js';
+import { sendBillUpdateEmail, sendDeadlineWarningEmail } from './notifications/bill-updates-digest.js';
+import { computeDeadlineWarning, sendDeadlineWarnings, daysUntil, tierForDaysLeft } from './notifications/deadline-warnings.js';
 import { getFixture } from './__fixtures__/classifier/index.js';
 
 // All harness bills share this URL prefix so resetHarness() can find and delete only them.
@@ -178,6 +179,116 @@ async function sendNotification(email, lines, changes) {
   }
   await sendBillUpdateEmail(email, lines, changes);
   return `sent to ${email}`;
+}
+
+/**
+ * Drive the deadline-warning path for a single harness bill against an overridable "today",
+ * so a deadline can be made N days out deterministically without waiting for the calendar.
+ * If the fixture declares a `deadline` ({ name, date }), that overrides the computed next
+ * deadline. Operates only on the throwaway sentinel bill. Run "Before" first to create it.
+ * @param {string} fixtureId
+ * @param {string} email recipient for the warning email
+ * @param {{ today?: string }} [opts] today in YYYY-MM-DD (defaults to the real current date)
+ * @returns {Promise<object>}
+ */
+export async function injectDeadlineWarning(fixtureId, email, { today } = {}) {
+  const fixture = getFixture(fixtureId);
+  if (!fixture) throw new Error(`Unknown fixture: ${fixtureId}`);
+
+  const url = sentinelUrl(fixtureId);
+  const bill = await db.selectFrom('bills')
+    .select(['id', 'bill_number', 'bill_title', 'bill_status', 'committee_assignment'])
+    .where('bill_url', '=', url)
+    .executeTakeFirst();
+  if (!bill) throw new Error(`Run "Before" first — no harness bill for fixture ${fixtureId}`);
+
+  const effectiveToday = today || new Date().toISOString().split('T')[0];
+
+  // Prefer the fixture's explicit deadline override (deterministic testing). Otherwise fall
+  // back to computing the bill's real next deadline from its status + committees. Either way
+  // we always report a deadline so the harness UI can show "what date to target".
+  const override = fixture.deadline;
+  const computed = override
+    ? (() => {
+        const daysLeft = daysUntil(override.date, effectiveToday);
+        return { nextName: override.name, nextDate: override.date, daysLeft, tier: tierForDaysLeft(daysLeft) };
+      })()
+    : computeDeadlineWarning(bill, effectiveToday);
+
+  // A deadline in the past means the bill missed it: it's dead, not "urgent". Mark the
+  // harness bill dead and send the bill-update digest with a DEAD pill (what the real scrape
+  // would do), rather than a coral deadline warning.
+  const deadlinePassed = !!computed && computed.daysLeft < 0;
+
+  let emailResult;
+  let dead = false;
+  if (!computed) {
+    emailResult = 'skipped (bill has no upcoming deadline)';
+  } else if (deadlinePassed) {
+    dead = true;
+    await db.updateTable('bills').set({ dead: true }).where('id', '=', bill.id).execute();
+    if (!email) {
+      emailResult = 'skipped (no email provided) — bill marked DEAD (deadline passed)';
+    } else if (!process.env.RESEND_API_KEY) {
+      emailResult = 'skipped (RESEND_API_KEY not set) — bill marked DEAD (deadline passed)';
+    } else {
+      const change = computeChange({
+        billId: bill.id,
+        billNumber: bill.bill_number,
+        billTitle: bill.bill_title,
+        oldStatus: bill.bill_status,
+        newStatus: bill.bill_status,
+        oldDead: false,
+        newDead: true,
+      });
+      const line = describeChange({
+        billNumber: bill.bill_number,
+        billTitle: bill.bill_title,
+        oldStatus: bill.bill_status,
+        newStatus: bill.bill_status,
+        oldDead: false,
+        newDead: true,
+      });
+      await sendBillUpdateEmail(email, [line], [change]);
+      emailResult = `bill marked DEAD (missed ${computed.nextName}) — digest sent to ${email}`;
+    }
+  } else if (!computed.tier) {
+    emailResult = `skipped (deadline ${computed.daysLeft} days out — outside the 7-day window)`;
+  } else if (!email) {
+    emailResult = 'skipped (no email provided)';
+  } else if (!process.env.RESEND_API_KEY) {
+    emailResult = 'skipped (RESEND_API_KEY not set)';
+  } else {
+    const warnings = [{
+      bill,
+      nextName: computed.nextName,
+      nextDate: computed.nextDate,
+      daysLeft: computed.daysLeft,
+      tier: computed.tier,
+    }];
+    const sent = [];
+    await sendDeadlineWarnings(warnings, {
+      fetchFollowers: async () => [{ bill_id: bill.id, user_id: 'harness', email }],
+      sendEmail: async (to, items, optsArg) => {
+        sent.push({ to, count: items.length, urgent: optsArg.urgent });
+        await sendDeadlineWarningEmail(to, items, optsArg);
+      },
+    });
+    emailResult = sent.length ? `sent to ${email} (urgent=${sent[0].urgent})` : 'skipped (no followers)';
+  }
+
+  return {
+    fixtureId,
+    billId: bill.id,
+    today: effectiveToday,
+    nextDeadlineName: computed?.nextName ?? null,
+    nextDeadlineDate: computed?.nextDate ?? null,
+    daysLeft: computed?.daysLeft ?? null,
+    tier: computed?.tier ?? null,
+    dead,
+    deadlinePassed,
+    emailResult,
+  };
 }
 
 /**

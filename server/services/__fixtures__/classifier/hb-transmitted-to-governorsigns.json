@@ -3,6 +3,10 @@
   "billTitle": "RELATING TO AGRICULTURE",
   "billNumber": "HB1099",
   "committeeAssignment": "AGR, ECD, FIN",
+  "deadline": {
+    "name": "Adjournment Sine Die",
+    "date": "2026-05-08"
+  },
   "before": {
     "expected": "transmittedGovernor",
     "statusLog": [

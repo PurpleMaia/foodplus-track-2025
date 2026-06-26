@@ -6,7 +6,7 @@ import { getAllBillsContext } from '../services/bills.js';
 import { db } from '../../db/kysely/client.js';
 import { sendAlertEmail } from '../services/notifications/cron-alerts.js';
 import { listFixtures } from '../services/__fixtures__/classifier/index.js';
-import { seedBefore, injectAfter, resetHarness } from '../services/classifierTestService.js';
+import { seedBefore, injectAfter, injectDeadlineWarning, resetHarness } from '../services/classifierTestService.js';
 const router = Router();
 
 // GET /api/scrape-bills - Start scraping process
@@ -177,6 +177,19 @@ router.post('/classifier-test/inject-after', async (req, res) => {
   } catch (error) {
     console.error('Error in classifier-test/inject-after endpoint:', error);
     res.status(500).json({ error: 'Failed to inject after state', details: error instanceof Error ? error.message : 'Unknown error' });
+  }
+});
+
+// POST /api/classifier-test/deadline-warn - run the deadline-warning path for the harness bill
+router.post('/classifier-test/deadline-warn', async (req, res) => {
+  try {
+    const { fixtureId, email, today } = req.body;
+    if (!fixtureId) return res.status(400).json({ error: 'fixtureId is required' });
+    const result = await injectDeadlineWarning(fixtureId, email, { today });
+    res.json(result);
+  } catch (error) {
+    console.error('Error in classifier-test/deadline-warn endpoint:', error);
+    res.status(500).json({ error: 'Failed to run deadline warning', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });
 

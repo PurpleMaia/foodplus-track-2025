@@ -3,6 +3,10 @@
   "billTitle": "RELATING TO LOCAL FOOD PRODUCTION",
   "billNumber": "SB1234",
   "committeeAssignment": "AGR, ECD, FIN",
+  "deadline": {
+    "name": "First Triple Referral Filing",
+    "date": "2026-02-12"
+  },
   "before": {
     "expected": "introduced",
     "statusLog": [
