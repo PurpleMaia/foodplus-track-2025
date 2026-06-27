@@ -1,16 +1,10 @@
 {
   "session": 2026,
   "deadlines": {
-    "first_triple_referral_filing": {
-      "HB": "2026-02-11",
-      "SB": "2026-02-12"
-    },
+    "first_triple_referral_filing": { "HB": "2026-02-11", "SB": "2026-02-12" },
     "first_lateral_filing": "2026-02-19",
     "first_lateral": "2026-02-20",
-    "single_referral_filing": {
-      "SB": "2026-03-05",
-      "HB": "2026-04-09"
-    },
+    "single_referral_filing": { "SB": "2026-03-05", "HB": "2026-04-09" },
     "first_decking": "2026-03-06",
     "first_crossover": "2026-03-12",
     "second_triple_referral_filing": "2026-03-19",
@@ -19,7 +13,7 @@
     "second_decking": "2026-04-10",
     "second_crossover": "2026-04-16",
     "final_decking_non_fiscal": "2026-04-29",
-    "final_decking_fiscal": "2026-06-29",
-    "adjournment_sine_die": "2026-07-03"
+    "final_decking_fiscal": "2026-05-01",
+    "adjournment_sine_die": "2026-05-08"
   }
 }

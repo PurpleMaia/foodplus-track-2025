@@ -46,7 +46,7 @@ test('CTA links to APP_URL', () => {
   const html = buildDeadlineWarningHtml([item()]);
   const appUrl = process.env.APP_URL || 'https://foodplus.purplemaia.org';
   assert.ok(html.includes(`href="${appUrl}"`));
-  assert.match(html, /View in Food\+ Bill Tracker/);
+  assert.match(html, /View in\s+Bill Tracker/);
 });
 
 test('current status pill rendered when present', () => {

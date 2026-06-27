@@ -48,7 +48,7 @@ test('CTA button links to APP_URL', () => {
   const html = buildBillUpdateHtml([change()]);
   const appUrl = process.env.APP_URL || 'https://foodplus.purplemaia.org';
   assert.ok(html.includes(`href="${appUrl}"`), 'CTA href points at APP_URL');
-  assert.match(html, /View in Food\+ Bill Tracker/);
+  assert.match(html, /View in\s+Bill Tracker/);
 });
 
 test('renders one card per change', () => {

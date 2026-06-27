@@ -33,3 +33,7 @@ dist-ssr
 .env.local
 .env.*.local
 config.toml
+
+# E2E notification seed script transient state (see scripts/seed-e2e-notifications.js)
+scripts/.seed-e2e-snapshot.json
+session-deadlines-2026.json.bak
