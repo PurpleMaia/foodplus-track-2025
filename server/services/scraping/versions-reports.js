@@ -84,6 +84,20 @@ async function upsertReports(billId, reports) {
   }
 }
 
+// The capitol document files are served as windows-1252, not UTF-8. Decoding
+// the bytes as UTF-8 (axios's default) corrupts non-breaking spaces and curly
+// punctuation into mojibake (����), which pollutes the extracted text. We fetch
+// raw bytes, detect the charset from the header or a <meta charset> tag, and
+// decode correctly before stripping tags.
+function detectCharset(buffer, contentType) {
+  const fromHeader = /charset=([^;\s]+)/i.exec(contentType || '');
+  if (fromHeader) return fromHeader[1].toLowerCase();
+  const head = Buffer.from(buffer).toString('latin1', 0, 2048);
+  const fromMeta = /charset=["']?([^"'>\s/]+)/i.exec(head);
+  if (fromMeta) return fromMeta[1].toLowerCase();
+  return 'windows-1252';
+}
+
 async function fetchDocumentText(htmlLink) {
   const response = await axios.get(htmlLink, {
     headers: {
@@ -93,8 +107,17 @@ async function fetchDocumentText(htmlLink) {
     },
     timeout: INDIVIDUAL_TIMEOUT,
     maxRedirects: 5,
+    responseType: 'arraybuffer',
   });
-  const $ = cheerio.load(response.data);
+  const charset = detectCharset(response.data, response.headers?.['content-type']);
+  let html;
+  try {
+    html = new TextDecoder(charset).decode(response.data);
+  } catch {
+    // Unknown/unsupported label — fall back to the charset these docs use.
+    html = new TextDecoder('windows-1252').decode(response.data);
+  }
+  const $ = cheerio.load(html);
   return $('body').text().replace(/\s+/g, ' ').trim();
 }
 
