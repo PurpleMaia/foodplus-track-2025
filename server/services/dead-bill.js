@@ -1,5 +1,6 @@
 /* Utility functions for determining whether a bill is dead based on its status updates and deadlines. */
 
+import { db } from '../../db/kysely/client.js';
 import { COLUMN_INDEX } from '../kanban-columns.js';
 import sessionDeadlines from '../../session-deadlines-2026.json' with { type: 'json' };
 
@@ -57,6 +58,7 @@ import sessionDeadlines from '../../session-deadlines-2026.json' with { type: 'j
  * @returns {string[]} - array of trimmed, non-empty committee names
  */
 export function parseCommittees(committeeAssignment) {
+  if (!committeeAssignment) return [];
   return committeeAssignment
     .split(',')
     .map((c) => c.trim())
@@ -85,12 +87,14 @@ export function getBillChamber(billNumber) {
 
 /**
  * A bill is fiscal if its committee assignment includes FIN or WAM.
- * Joint committees like JDL/WAM also count.
+ * Joint committees like JDL/WAM also count. A bill with no committee
+ * assignment is treated as non-fiscal.
  *
  * @param {string} committeeAssignment - comma-separated committee names
  * @returns {boolean} - true if the bill is fiscal
  */
 export function isFiscalBill(committeeAssignment) {
+  if (!committeeAssignment) return false;
   return committeeAssignment.toUpperCase().includes('FIN') ||
     committeeAssignment.toUpperCase().includes('WAM');
 }
@@ -336,7 +340,7 @@ export function getApplicableDeadlines(referralType, chamber, preCrossover, dead
   // --- Endgame deadlines (apply to all bills regardless of phase) ---
 
   // Final Decking: fiscal bills (FIN/WAM) get until May 1, non-fiscal until Apr 29
-  const fiscal = committeeAssignment ? isFiscalBill(committeeAssignment) : false;
+  const fiscal = isFiscalBill(committeeAssignment);
   entries.push({
     name: fiscal ? 'Final Decking (Fiscal)' : 'Final Decking (Non-Fiscal)',
     date: fiscal ? d.final_decking_fiscal : d.final_decking_non_fiscal,

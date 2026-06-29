@@ -46,6 +46,21 @@ test('no upcoming deadline → null', () => {
   assert.equal(r, null);
 });
 
+// Regression: a bill with no committee assignment must NOT crash the deadline calc.
+// It still computes a deadline from date + status, treated as non-fiscal.
+test('null committee → still computes a deadline, no crash', () => {
+  const r = computeDeadlineWarning(bill({ committee_assignment: null }), '2026-02-27');
+  assert.ok(r, 'expected a deadline result, got null');
+  assert.equal(r.daysLeft, 7);
+  assert.equal(r.tier, '7');
+});
+
+test('empty-string committee → treated as non-fiscal, no crash', () => {
+  const r = computeDeadlineWarning(bill({ committee_assignment: '' }), '2026-02-27');
+  assert.ok(r, 'expected a deadline result, got null');
+  assert.equal(r.tier, '7');
+});
+
 // tierForDaysLeft thresholds — a passed deadline (negative days) must NOT be urgent.
 test('tierForDaysLeft: passed deadline (negative) → null, not urgent', () => {
   assert.equal(tierForDaysLeft(-1), null);
