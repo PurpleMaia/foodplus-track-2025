@@ -5,7 +5,7 @@ import { scrapeIndividual } from '../services/scraping/individual-bill.js';
 import { getAllBillsContext } from '../services/bills.js';
 import { db } from '../../db/kysely/client.js';
 import { sendAlertEmail } from '../services/notifications/cron-alerts.js';
-import { listFixtures } from '../services/__fixtures__/classifier/index.js';
+import { listFixtures } from '../tests/__fixtures__/classifier/index.js';
 import { seedBefore, injectAfter, injectDeadlineWarning, resetHarness } from '../services/classifierTestService.js';
 const router = Router();
 

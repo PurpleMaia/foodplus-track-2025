@@ -3,7 +3,7 @@ import { classifyStatusWithDebug } from './statusClassifierService.js';
 import { computeChange, describeChange } from './statusChange.js';
 import { sendBillUpdateEmail, sendDeadlineWarningEmail } from './notifications/bill-updates-digest.js';
 import { computeDeadlineWarning, sendDeadlineWarnings, daysUntil, tierForDaysLeft } from './notifications/deadline-warnings.js';
-import { getFixture } from './__fixtures__/classifier/index.js';
+import { getFixture } from '../tests/__fixtures__/classifier/index.js';
 
 // All harness bills share this URL prefix so resetHarness() can find and delete only them.
 // Real scraped bills never use a test:// URL, so production data is never touched.
