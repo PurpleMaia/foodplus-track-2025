@@ -36,9 +36,12 @@ reusing retry/timeout constants from
 
 ## Data model
 
-The migration will be written separately (by the user). The scraper's save
-logic assumes the following `legislators` table. UUID primary key, matching
-the `bills` table convention (`id: Generated<string>`).
+The migration is provided as golang-migrate up/down SQL at
+`db/migrations/000006_create-legislators-table.{up,down}.sql` (matching the
+repo's existing migration format and conventions — `gen_random_uuid()`,
+`timestamptz ... DEFAULT now()`, `public.` schema). The user commits/applies
+it. The scraper's save logic assumes the following `legislators` table. UUID
+primary key, matching the `bills` table convention (`id: Generated<string>`).
 
 | column        | type                     | notes |
 |---------------|--------------------------|-------|
@@ -54,6 +57,7 @@ the `bills` table convention (`id: Generated<string>`).
 | `phone`       | text, nullable           | from the address block |
 | `email`       | text, nullable           | from the `mailto:` link |
 | `in_office`   | boolean, not null, default true | maintained by the scraper |
+| `term_ended`  | date, nullable           | parsed from `Term of Office Ended: MM/DD/YYYY` when present |
 | `created_at`  | timestamptz              | like `bills` |
 | `updated_at`  | timestamptz              | like `bills` |
 
@@ -155,18 +159,19 @@ resolve the person.
 
 ### Out-of-office detection
 
-The live page (a `MembersActive` repeater) currently shows only active
-members and contains **no** out-of-office verbiage — confirmed by grep on
-2026-06-29. The primary, confirmed signal is therefore **absence from the
-scrape** (step 3).
+Two signals, both flipping `in_office = false`:
 
-As a defensive secondary signal, the parser checks the card's name/district
-region (not the free-text area description, which could legitimately contain
-a marker word) against a small, easily-editable list of case-insensitive
-marker phrases (`out of office`, `vacant`, `no longer`, `resigned`). A code comment must
-note these are **unconfirmed against live data** and should be adjusted once
-a real out-of-office card is observed. This keeps the flip logic present and
-trivial to correct without asserting a string we have not seen.
+1. **Absence from the scrape** (step 3) — a stored `member_id` not present in
+   the current scrape.
+2. **In-card verbiage** — a card containing the text
+   `Term of Office Ended: MM/DD/YYYY`. When this appears, set
+   `in_office = false` and parse the trailing date into `term_ended` (a
+   nullable date column). The match is a case-insensitive regex
+   `/Term of Office Ended:\s*(\d{1,2}\/\d{1,2}\/\d{4})/`.
+
+The live `MembersActive` repeater currently shows only active members (no
+such verbiage present 2026-06-29), but cards can carry this string when a
+member's term has ended, so the parser handles it.
 
 ## Error handling
 
@@ -194,7 +199,8 @@ no DB integration test in this scope.
 
 ## Out of scope
 
-- The database migration (written separately by the user).
+- Applying/committing the migration (SQL is written here; the user runs it).
+- Regenerating `db/generated.ts` types (the user does this after migrating).
 - Cron / scheduling.
 - Linking `bills.introducer` to `legislators` rows (future work; this design
   only ensures the history needed for it exists).
