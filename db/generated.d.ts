@@ -152,7 +152,7 @@ export interface Tags {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   name: string;
-  tenant_id: string | null;
+  tenant_id: string;
   updated_at: Generated<Timestamp>;
 }
 
