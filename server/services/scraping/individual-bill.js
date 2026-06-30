@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import { checkAndUpdateDeadStatus } from '../dead-bill.js';
 import { computeChange } from '../statusChange.js';
 import { classifyStatusWithLLM } from '../statusClassifierService.js';
+import { parseVersionsAndReports, saveVersionsAndReports } from './versions-reports.js';
 import {
   getRandomUserAgent,
   delay,
@@ -230,6 +231,15 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
         } catch (err) {
           console.error(`[STATUS-AI] Failed to classify bill_status for ${billNumber}:`, err?.message || err);
         }
+      }
+
+      // Capture measure versions and committee reports. Isolated: any failure here
+      // (parse, DB, or a single document fetch) must not fail the main scrape.
+      try {
+        const parsedDocs = parseVersionsAndReports(response.data);
+        await saveVersionsAndReports(billID, billNumber, parsedDocs);
+      } catch (err) {
+        console.warn(`[VERSIONS] ${billNumber}: failed to capture versions/reports:`, err?.message || err);
       }
 
       return billData;
