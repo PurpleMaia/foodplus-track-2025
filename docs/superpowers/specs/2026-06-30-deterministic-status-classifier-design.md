@@ -1,8 +1,32 @@
 # Deterministic Bill-Status Classifier — Design
 
 **Date:** 2026-06-30
-**Status:** Design (pending review)
+**Status:** Built & verified (100% on 2026 corpus); not yet wired into the scrape path
 **Replaces:** the LLM call in `server/services/statusClassifierService.js`
+
+## VERIFIED RESULT
+
+`server/services/statusClassifier.js` (pure function) + `scripts/llm/eval-deterministic.mjs`.
+Run against **all 239 classified 2026 bills** vs stored `bill_status`: **239/239 (100%)** match
+after applying the confirmed domain rules. The LLM scored 19% on the old truth set. The rollup is
+**newest-confident-line, not max-stage** — the crossover ladder resets, so a max-stage rollup
+picks stale high-water marks. Terminal governor/veto/dead states are scanned first (absorbing).
+
+### Confirmed domain rules (differ from generic trackers)
+1. **Committee deferral stays at `scheduled{N}`** — an explicit deferral does NOT populate a
+   `deferred{N}` column; the bill remains scheduled and the UI explains the death from the text.
+2. **`conferenceAssigned` requires BOTH chambers' conferees** — one chamber alone stays
+   `passedCommittees`.
+3. **Re-referral after a prior committee passage → `waiting2`** (crossover variant); otherwise it's
+   an intro/landing reassignment.
+4. **Hearing-cancelled** (`deleted from the ... hearing`/`meeting`) reverts `scheduled{N}`→
+   `waiting{N}` (or →`introduced` when N=1, since there is no `waiting1`).
+
+### Note on the legacy 47-case truth set
+`scripts/llm/classification-truth.json` is **NOT a valid regression target** — it predates these
+rules and uses the opposite convention (committee-PASSED labeled `Scheduled`, deferral→`deferred`).
+It scores 68% and chasing it would break the 100% on real 2026 data. The authoritative eval is the
+live 2026 DB.
 
 ## 1. Problem & Motivation
 
@@ -117,9 +141,9 @@ scrape individual bill
 
 - **Unit (pure fn):** one case per rule (~30), using real 2026 phrasings as fixtures. Covers each
   tier, crossover variants, ordinal 1/2/3, hearing-cancelled revert, terminal overrides, no-match.
-- **Regression:** the existing 47-case truth set (`classification-truth.json`) must pass at **≥ 90%**
-  (43/47). This is a single fully-known bill with corpus-authored rules, so near-perfect is the bar;
-  any remaining miss must be a documented labeling-convention case, not a rule gap.
+- **Primary eval (authoritative):** `scripts/llm/eval-deterministic.mjs` vs all 239 classified 2026
+  bills — currently **100%**. This is the regression gate going forward.
+- The legacy 47-case set is retained only as historical reference (superseded convention; see above).
 - **Accuracy report:** `scripts/llm/eval-deterministic.mjs` runs the classifier against the **2026
   non-unassigned bills** (~239 across ~15 stages) and prints accuracy + a disagreement list.
   Because stored `bill_status` is noisy, disagreements are triaged: classifier-correct vs

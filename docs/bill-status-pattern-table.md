@@ -53,8 +53,17 @@ NOT a terminal governor stage. They match none of the above and fall through to 
 | 1.2 | `Conference [Cc]ommittee recommends that the measure be PASSED` | `conferencePassed` | fixture |
 | 1.3 | `Bill scheduled for Conference Committee Meeting\|Conference committee meeting (to reconvene\|scheduled)\|Conference Committee Meeting will reconvene` | `conferenceScheduled` | 13+30+... |
 | 1.4 | `discharge of all .* Conferees\|Conferee\(s\) discharged\|conferees being discharged` | `conferenceAssigned` | 84+8+7 (conference broke down → back to awaiting) |
-| 1.5 | `Conferees Appointed\|notice of (appointment of )?(Senate\|House) conferees\|notice of change in .* conferees` | `conferenceAssigned` | 50+35+4 |
-| 1.6 | `Received notice of disagreement\|(Senate\|House) disagrees with .* amendment` | `conferenceAssigned` | 16+9+8 |
+| 1.5 | `Conferees Appointed\|notice of (appointment of )?(Senate\|House) conferees\|notice of change in .* conferees` | `conferenceAssigned` **if `bothConferees`** else `passedCommittees` | 50+35+4 |
+| 1.6 | `Received notice of disagreement\|(Senate\|House) disagrees with .* amendment` | `conferenceAssigned` **if `bothConferees`** else `passedCommittees` | 16+9+8 |
+
+> **DOMAIN RULE — `conferenceAssigned` requires BOTH chambers to have appointed conferees.**
+> `bothConferees` = the history contains a House-conferee appointment AND a Senate-conferee
+> appointment. One chamber alone (or a bare disagreement) keeps the bill at `passedCommittees`.
+
+> **DOMAIN RULE — re-referral after a prior committee passage → `waiting2` (crossover variant).**
+> `Re-Referred`/`Recommitted` when the phase already has a committee-passage line means the bill
+> cleared a committee and is waiting for the next one. With no prior passage it's an intro/landing
+> (re)assignment (`introduced` / `crossoverWaiting1`).
 
 If `bothChambers === false`, the whole tier is skipped even if text says "conference".
 
@@ -78,7 +87,12 @@ each prefixed `crossover` when `crossover === true` (e.g. `crossoverWaiting2`).
 |---|---|---|---|
 | 3.1 | `deleted the measure from (the public hearing\|decision making)` | **revert** `SCHED(n)` → `WAIT(n)` | 10+3 (hearing cancelled) |
 | 3.2 | `scheduled to be heard by\|has scheduled a public hearing\|will hold a public decision making\|Meeting Scheduled on` | `SCHED(ordinal)` | 7+6+4+3 |
-| 3.3 | `committee(\(s\))? on .* deferred the measure\|be DEFERRED\|recommend(s)? that the measure be deferred` | `DEFER(ordinal)` | **120+107** |
+| 3.3 | `committee(\(s\))? on .* deferred the measure\|be DEFERRED\|recommend(s)? that the measure be deferred` | **`SCHED(ordinal)`** (see rule below) | **120+107** |
+
+> **DOMAIN RULE — deferral does NOT move to a `deferred{N}` column.** An explicit committee
+> deferral keeps the bill at `scheduled{N}` (the hearing it was scheduled for). The deferral is
+> effectively a death; the UI reads the deferral text to explain why. The `deferred1/2/3` columns
+> in the enum are therefore never produced by the classifier.
 | 3.4 | `recommend(s)? that the measure be PASSED` | `WAIT(ordinal+1)` | **557+489** (most common line) |
 | 3.5 | `Reported from .* recommendation of passage on Second\|recommending passage on (Second\|Third)` | `WAIT(ordinal+1)` | 54+23 |
 | 3.6 | `Reported from .* recommending referral to\|Report adopted; referred to the committee` | `WAIT(ordinal+1)` | 18+3 |
