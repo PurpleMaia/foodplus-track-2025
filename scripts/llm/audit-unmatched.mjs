@@ -22,6 +22,22 @@ if (!all) q = q.where('year', '=', year);
 const bills = await q.execute();
 console.log(`Auditing ${bills.length} bills${all ? ' (ALL years)' : ` (year=${year})`}\n`);
 
+// Bulk-fetch all status_updates for these bills in ONE query, then group in memory
+// (per-bill queries are far too slow at ~6k bills).
+const billIds = bills.map(b => b.id);
+const updatesById = new Map();
+if (billIds.length) {
+  const rows = await db.selectFrom('status_updates')
+    .select(['bill_id', 'chamber', 'date', 'statustext'])
+    .where('bill_id', 'in', billIds)
+    .orderBy(sql`cast(date as date)`, 'desc')
+    .execute();
+  for (const r of rows) {
+    if (!updatesById.has(r.bill_id)) updatesById.set(r.bill_id, []);
+    updatesById.get(r.bill_id).push({ chamber: r.chamber, date: r.date, statustext: r.statustext });
+  }
+}
+
 const unmatchedShapes = new Map();  // normalized shape -> { count, example, bills:Set }
 const disagreements = [];           // classified-but-newest-line-only bills where DB differs
 let noNewest = 0;
@@ -33,12 +49,8 @@ const shape = (t) => t
   .replace(/\s+/g, ' ').trim().slice(0, 80);
 
 for (const b of bills) {
-  const updates = await db.selectFrom('status_updates as su')
-    .select(['chamber', 'date', 'statustext'])
-    .where('bill_id', '=', b.id)
-    .orderBy(sql`cast(su.date as date)`, 'desc')
-    .execute();
-  if (!updates.length) { noNewest++; continue; }
+  const updates = updatesById.get(b.id);
+  if (!updates || !updates.length) { noNewest++; continue; }
 
   const { status, unmatched } = classifyStatus({ billNumber: b.bill_number, statusUpdates: updates, currentStatus: null });
 

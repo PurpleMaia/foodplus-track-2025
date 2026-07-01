@@ -123,9 +123,13 @@ function classifyLine(text, ctx) {
   // 3.5/3.6/3.7 reported-out / passed-second-reading + referral -> waiting for the named next cmt.
   // Here the named committee IS the next one, so use its ordinal directly (no +1).
   if (/Reported from .*recommendation of passage on (Second|Third)|recommending passage on (Second|Third)|Reported from .*recommending referral to|Report adopted; referred to the committee|Passed Second Reading.*referred to the committee|Report adopted; Passed Second Reading.*referred/i.test(text)) {
-    const nextOrd = committeeOrdinal(text, order);
-    const n = nextOrd > 0 ? nextOrd : Math.min(ord + 1, 3);
-    return { stage: pref(crossover, `waiting${Math.max(n, 2)}`) };
+    // The bill is waiting for the DESTINATION committee. Prefer the committee named after
+    // "referral/referred to ..."; fall back to any named committee, then ord+1. Clamp to [2,3].
+    const dest = text.match(/referr(?:al to|ed to)(?: the committee\(s\) on)? ([A-Z]{2,4}(?:\/[A-Z]{2,4})*)/i);
+    const destOrd = dest ? committeeOrdinal(dest[1], order) : 0;
+    const nextOrd = destOrd > 0 ? destOrd : (committeeOrdinal(text, order) || Math.min(ord + 1, 3));
+    const n = Math.min(Math.max(nextOrd, 2), 3);
+    return { stage: pref(crossover, `waiting${n}`) };
   }
 
   // ---- Tier 4: introduction / crossover landing ----
