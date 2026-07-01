@@ -3,7 +3,8 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { checkAndUpdateDeadStatus } from '../dead-bill.js';
 import { computeChange } from '../statusChange.js';
-import { classifyStatusWithLLM } from '../statusClassifierService.js';
+// Deterministic pattern-table classifier (kept the export name for back-compat).
+import { classifyStatusWithLLM as classifyBillStatus } from '../statusClassifierService.js';
 import { parseVersionsAndReports, saveVersionsAndReports } from './versions-reports.js';
 import {
   getRandomUserAgent,
@@ -211,25 +212,26 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
         }
       }
 
-      // AI-derive the kanban bill_status when the status changed or this is a brand-new bill.
-      // Runs after updates + bill row are persisted (the classifier reads status_updates and
-      // the bills row). Isolated try/catch: an LLM failure must not fail the HTTP scrape.
+      // Derive the kanban bill_status (deterministic pattern-table classifier) when the status
+      // changed or this is a brand-new bill. Runs after updates + bill row are persisted (the
+      // classifier reads status_updates and the bills row). Isolated try/catch: a classification
+      // failure must not fail the HTTP scrape.
       const isBrandNew = isNewBill || insertedNewBill;
       if (hasStatus && (isBrandNew || priorStatus !== currentStatus)) {
         try {
-          console.log(`[STATUS-AI] Status changed for ${billNumber} (new=${isBrandNew}); classifying...`);
-          const newBillStatus = await classifyStatusWithLLM(billID);
+          console.log(`[STATUS] Status changed for ${billNumber} (new=${isBrandNew}); classifying...`);
+          const newBillStatus = await classifyBillStatus(billID);
           if (newBillStatus) {
             await db.updateTable('bills')
               .set({ bill_status: newBillStatus })
               .where('id', '=', billID)
               .execute();
-            console.log(`[STATUS-AI] ${billNumber} bill_status set to "${newBillStatus}"`);
+            console.log(`[STATUS] ${billNumber} bill_status set to "${newBillStatus}"`);
           } else {
-            console.warn(`[STATUS-AI] ${billNumber}: no usable classification, bill_status left unchanged`);
+            console.warn(`[STATUS] ${billNumber}: no usable classification, bill_status left unchanged`);
           }
         } catch (err) {
-          console.error(`[STATUS-AI] Failed to classify bill_status for ${billNumber}:`, err?.message || err);
+          console.error(`[STATUS] Failed to classify bill_status for ${billNumber}:`, err?.message || err);
         }
       }
 
