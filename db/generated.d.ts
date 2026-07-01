@@ -69,6 +69,31 @@ export interface BillTags {
   tag_id: string;
 }
 
+export interface BillVersions {
+  ai_summary: string | null;
+  bill_id: string;
+  created_at: Generated<Timestamp | null>;
+  html_link: string | null;
+  id: Generated<string>;
+  label: string;
+  original_text: string | null;
+  pdf_link: string | null;
+  updated_at: Generated<Timestamp | null>;
+}
+
+export interface CommitteeReports {
+  ai_summary: string | null;
+  bill_id: string;
+  created_at: Generated<Timestamp | null>;
+  html_link: string | null;
+  id: Generated<string>;
+  label: string;
+  original_text: string | null;
+  pdf_link: string | null;
+  report_code: string | null;
+  updated_at: Generated<Timestamp | null>;
+}
+
 export interface InviteTokens {
   accepted_at: Timestamp | null;
   created_at: Generated<Timestamp | null>;
@@ -79,6 +104,24 @@ export interface InviteTokens {
   status: Generated<string>;
   tenant_id: string;
   token: string;
+}
+
+export interface Legislators {
+  area: string | null;
+  chamber: string | null;
+  created_at: Generated<Timestamp>;
+  district: number | null;
+  email: string | null;
+  first_name: string | null;
+  id: Generated<string>;
+  in_office: Generated<boolean>;
+  last_name: string | null;
+  member_id: string;
+  party: string | null;
+  phone: string | null;
+  room: string | null;
+  term_ended: Timestamp | null;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface Members {
@@ -198,11 +241,22 @@ export interface UserBills {
   user_id: string | null;
 }
 
+export interface UserPreferences {
+  ai_opt_in: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  kanban_detailed_view: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface DB {
   auth_key: AuthKey;
   bill_tags: BillTags;
+  bill_versions: BillVersions;
   bills: Bills;
+  committee_reports: CommitteeReports;
   invite_tokens: InviteTokens;
+  legislators: Legislators;
   members: Members;
   org_bills: OrgBills;
   pending_proposals: PendingProposals;
@@ -216,4 +270,5 @@ export interface DB {
   user: User;
   user_bill_preferences: UserBillPreferences;
   user_bills: UserBills;
+  user_preferences: UserPreferences;
 }
