@@ -41,9 +41,21 @@ function referralOrder(updatesNewestFirst, phaseChamber) {
   return order;
 }
 
-/** Ordinal (1-based) of the committee named in `text`, per the referral order. 0 if none. */
+// Tokens that look like committee acronyms but are NOT committees — draft markers, vote words,
+// chamber/procedural codes. Prevents committeeOrdinal from matching junk like "HD"/"PASS"/"WITH".
+const NON_COMMITTEE = new Set([
+  'HD', 'SD', 'CD', 'HB', 'SB', 'HR', 'SR', 'HCR', 'SCR', 'GM',
+  'PASS', 'PASSED', 'WITH', 'AMEN', 'TS', 'AYE', 'AYES', 'NO', 'NOES', 'THE', 'AND',
+  'VIA', 'AM', 'PM', 'HRS', 'NOT', 'ALL', 'REP', 'SEN',
+]);
+
+/**
+ * Ordinal (1-based) of the committee named in `text`, per the referral order. 0 if none.
+ * Only tokens present in `order` count, so junk acronyms are ignored by construction; the
+ * NON_COMMITTEE set is a belt-and-suspenders guard for readability/robustness.
+ */
 function committeeOrdinal(text, order) {
-  const cmts = text.match(/[A-Z]{2,4}(?:\/[A-Z]{2,4})*/g) || [];
+  const cmts = (text.match(/[A-Z]{2,4}(?:\/[A-Z]{2,4})*/g) || []).filter(c => !NON_COMMITTEE.has(c));
   for (const c of cmts) {
     const i = order.indexOf(c);
     if (i >= 0) return i + 1;
@@ -85,8 +97,12 @@ function classifyLine(text, ctx) {
   if (/Received from (House|Senate).*in amended form/i.test(text)) return { stage: 'passedCommittees' };
   if (crossover && /Passed (Third|Final) Reading.*Transmitted/i.test(text)) return { stage: 'passedCommittees' };
 
-  // ---- Ambiguous context-only lines: no-op (skip to the next line) ----
-  if (/The recommendation was not adopted|Received notice of Final Reading/i.test(text)) return null;
+  // "The recommendation was not adopted" NEGATES the immediately-preceding committee
+  // recommendation (usually a PASS): the pass did not stick, so the bill stays at its committee
+  // hearing stage rather than advancing. Handled by the rollup (demotes the next PASS line).
+  if (/The recommendation was not adopted/i.test(text)) return { notAdopted: true };
+  // Context-only notice line: skip to the next line.
+  if (/Received notice of Final Reading/i.test(text)) return null;
 
   // ---- Tier 3: committee stage (family rules) ----
   const ord = committeeOrdinal(text, order) || 1;
@@ -98,10 +114,11 @@ function classifyLine(text, ctx) {
   // 3.3 deferred — DOMAIN RULE: an explicit committee deferral does NOT move the bill to a
   // deferred{N} column. The bill STAYS at scheduled{N} (the hearing it was scheduled for); the
   // deferral is effectively a death and the UI reads the deferral text to explain why.
-  if (/deferred the measure|be DEFERRED|recommend(s)? that the measure be deferred/i.test(text))
+  if (/deferred the measure|be DEFERRED|recommend(?:\(s\)|s)? that the measure be deferred/i.test(text))
     return { stage: pref(crossover, `scheduled${ord}`) };
-  // 3.4 committee passed -> waiting for next
-  if (/recommend(s)? that the measure be PASSED/i.test(text))
+  // 3.4 committee passed -> waiting for next.  NOTE: the corpus has BOTH "recommend that"
+  // (House) and "recommend(s) that" with LITERAL parens (Senate) — match all forms.
+  if (/recommend(?:\(s\)|s)? that the measure be PASSED/i.test(text))
     return { stage: pref(crossover, `waiting${Math.min(ord + 1, 3)}`) };
   // 3.5/3.6/3.7 reported-out / passed-second-reading + referral -> waiting for the named next cmt.
   // Here the named committee IS the next one, so use its ordinal directly (no +1).
@@ -155,7 +172,7 @@ export function classifyStatus({ billNumber, statusUpdates, currentStatus }) {
   // re-referral (passed-then-re-referred = waiting for next committee).
   const priorPassageInPhase = statusUpdates.some(u =>
     u.chamber?.toUpperCase() === phaseChamber &&
-    /recommend(s)? that the measure be PASSED|recommendation of passage on (Second|Third)/i.test(u.statustext)
+    /recommend(?:\(s\)|s)? that the measure be PASSED|recommendation of passage on (Second|Third)/i.test(u.statustext)
   );
 
   const ctx = { crossover, bothChambers, bothConferees, order, priorPassageInPhase };
@@ -175,17 +192,31 @@ export function classifyStatus({ billNumber, statusUpdates, currentStatus }) {
   // History is already folded into ctx (crossover / ordinal / bothChambers). "revert" and
   // context-only lines (e.g. "Received notice of passage") are skipped to the next line.
   let pendingRevert = false;
+  let pendingNotAdopted = false;
   for (const u of statusUpdates) {
     const res = classifyLine(u.statustext, ctx);
     if (!res) { unmatched.push(`[${u.chamber}] ${u.statustext}`); continue; }
     if (res.dead) { dead = true; continue; }
     if (res.revert) { pendingRevert = true; continue; }
+    if (res.notAdopted) { pendingNotAdopted = true; continue; }
     let stage = res.stage;
+    if (pendingNotAdopted) {
+      // The preceding recommendation failed: a PASS (waiting{N}) demotes to scheduled{N-1}
+      // (the committee that just failed to advance it); non-PASS stages are left as-is.
+      const m = stage.match(/^(crossover)?[Ww]aiting(\d)$/);
+      if (m) {
+        const n = Math.max(Number(m[2]) - 1, 1);
+        stage = pref(!!m[1], `scheduled${n}`);
+      }
+      pendingNotAdopted = false;
+    }
     if (pendingRevert) {
       // A hearing was cancelled AFTER this scheduling line: scheduled{n} -> waiting{n}.
       // A cancelled 1st hearing reverts to introduced/crossoverWaiting1 (no waiting1 column).
+      // Only a scheduled{n} stage can be reverted; for anything else the revert is a no-op.
       if (/^(crossover)?[Ss]cheduled1$/.test(stage)) stage = crossover ? 'crossoverWaiting1' : 'introduced';
-      else stage = stage.replace(/([Ss])cheduled(\d)/, (_, c, n) => (c === 'S' ? 'Waiting' : 'waiting') + n);
+      else if (/^(crossover)?[Ss]cheduled\d$/.test(stage)) stage = stage.replace(/([Ss])cheduled(\d)/, (_, c, n) => (c === 'S' ? 'Waiting' : 'waiting') + n);
+      pendingRevert = false;
     }
     return finalize(stage, dead, currentStatus);
   }
