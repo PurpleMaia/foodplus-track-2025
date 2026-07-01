@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { parseVersionsAndReports } from '../services/scraping/versions-reports.js';
+import { parseVersionsAndReports, decodeHtmlBuffer } from '../services/scraping/versions-reports.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const html = readFileSync(join(__dirname, '../../hawaii-data-test.html'), 'utf8');
+const html = readFileSync(join(__dirname, '../services/scraping/__fixtures__/hawaii-data-test.html'), 'utf8');
 
 test('parses all 7 versions in document order with absolute links', () => {
   const { versions } = parseVersionsAndReports(html);
@@ -32,4 +32,28 @@ test('returns empty arrays for html with no version/report cards', () => {
   const { versions, reports } = parseVersionsAndReports('<html><body><p>nothing</p></body></html>');
   assert.deepEqual(versions, []);
   assert.deepEqual(reports, []);
+});
+
+test('decodeHtmlBuffer decodes windows-1252 declared in a meta tag', () => {
+  // 0x92 is a right single quote in windows-1252; invalid as UTF-8.
+  const buf = Buffer.concat([
+    Buffer.from('<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252"></head><body>Hawai', 'latin1'),
+    Buffer.from([0x92]),
+    Buffer.from('i</body></html>', 'latin1'),
+  ]);
+  const html = decodeHtmlBuffer(buf, 'text/html');
+  assert.ok(html.includes('Hawai’i'));
+  assert.ok(!html.includes('�'));
+});
+
+test('decodeHtmlBuffer prefers the HTTP content-type charset over the meta tag', () => {
+  const buf = Buffer.from('<html><head><meta charset="windows-1252"></head><body>café</body></html>', 'utf8');
+  const html = decodeHtmlBuffer(buf, 'text/html; charset=utf-8');
+  assert.ok(html.includes('café'));
+});
+
+test('decodeHtmlBuffer defaults to utf-8 and survives an unknown charset', () => {
+  assert.ok(decodeHtmlBuffer(Buffer.from('<body>ok</body>', 'utf8'), null).includes('ok'));
+  const bogus = Buffer.from('<meta charset="not-a-charset"><body>ok</body>', 'utf8');
+  assert.ok(decodeHtmlBuffer(bogus, null).includes('ok'));
 });
