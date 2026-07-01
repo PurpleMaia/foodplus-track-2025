@@ -26,6 +26,7 @@ for (const b of bills) {
     .select(['chamber', 'date', 'statustext'])
     .where('bill_id', '=', b.id)
     .orderBy(sql`cast(su.date as date)`, 'desc')
+            .orderBy('statustext', 'asc') // stable tiebreaker for same-date rows
     .execute();
 
   // Classify from scratch (no currentStatus) so we test the rules, not the guard.

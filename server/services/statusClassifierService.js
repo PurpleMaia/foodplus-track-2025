@@ -29,6 +29,7 @@ async function fetchBillContext(billId) {
             .select(['chamber', 'date', 'statustext'])
             .where('bill_id', '=', billId)
             .orderBy(sql`cast(su.date as date)`, 'desc')
+            .orderBy('statustext', 'asc') // stable tiebreaker for same-date rows
             .execute();
 
         return { bill, statusUpdates };

@@ -142,7 +142,9 @@ function classifyLine(text, ctx) {
     return { stage: crossover ? 'crossoverWaiting1' : 'introduced' };
   }
   if (/Referred to .*(referral sheet|,)|Referred to [A-Z]/i.test(text)) return { stage: crossover ? 'crossoverWaiting1' : 'introduced' };
-  if (/Introduced and Pass(ed)? First Reading|Pass(ed)? First Reading|^Introduced\.|Pending introduction/i.test(text)) return { stage: 'introduced' };
+  // First-reading / introduction: in the ORIGINATING chamber this is `introduced`; after crossover
+  // the receiving chamber's first reading means the bill just landed there -> crossoverWaiting1.
+  if (/Introduced and Pass(ed)? First Reading|Pass(ed)? First Reading|^Introduced\.|Pending introduction/i.test(text)) return { stage: crossover ? 'crossoverWaiting1' : 'introduced' };
 
   return null; // no match
 }
@@ -195,14 +197,24 @@ export function classifyStatus({ billNumber, statusUpdates, currentStatus }) {
   // Current status = the newest line that yields a confident stage. Walk newest->oldest.
   // History is already folded into ctx (crossover / ordinal / bothChambers). "revert" and
   // context-only lines (e.g. "Received notice of passage") are skipped to the next line.
+  // Dates on which a "recommendation was not adopted" line appears. The DB does not guarantee
+  // intra-date row order, so instead of relying on adjacency we treat ANY committee PASS on such
+  // a date as not-stuck (the pass was reversed the same day). Order-independent.
+  const notAdoptedDates = new Set(
+    statusUpdates.filter(u => /The recommendation was not adopted/i.test(u.statustext)).map(u => u.date)
+  );
+
   let pendingRevert = false;
   let pendingNotAdopted = false;
-  for (const u of statusUpdates) {
+  for (let i = 0; i < statusUpdates.length; i++) {
+    const u = statusUpdates[i];
     const res = classifyLine(u.statustext, ctx);
     if (!res) { unmatched.push(`[${u.chamber}] ${u.statustext}`); continue; }
     if (res.dead) { dead = true; continue; }
     if (res.revert) { pendingRevert = true; continue; }
     if (res.notAdopted) { pendingNotAdopted = true; continue; }
+    // A PASS on a date that also has a "not adopted" line was reversed that same day.
+    if (!pendingNotAdopted && notAdoptedDates.has(u.date)) pendingNotAdopted = true;
     let stage = res.stage;
     if (pendingNotAdopted) {
       // The preceding recommendation failed: a PASS (waiting{N}) demotes to scheduled{N-1}

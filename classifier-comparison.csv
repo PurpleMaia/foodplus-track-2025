@@ -1,0 +1,240 @@
+bill_number,ai_classifier_db_status,deterministic_classifier,match,human_flagged_misclassification,dead,unmatched_count,newest_chamber,newest_date,newest_status_line
+HB1518,governorSigns,governorSigns,YES,,,0,S,5/26/2026,"Act 028, 05/22/2026 (Gov. Msg. No. 1128)."
+HB1561,waiting2,waiting2,YES,,,0,H,2/17/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on FIN with none voting aye with reservations; none voting no (0) and Representative(s) Cochran, Lee, M., Poepoe excused (3)."
+HB1570,introduced,introduced,YES,,,0,H,1/26/2026,"Referred to AGR/EEP, CPC, FIN, referral sheet 1"
+HB1571,scheduled2,scheduled2,YES,,,0,H,2/26/2026,The committee(s) on CPC recommend(s) that the measure be deferred.
+HB1572,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB1585,introduced,introduced,YES,,,0,H,1/26/2026,"Referred to HSH, ECD, FIN, referral sheet 1"
+HB1596,crossoverWaiting1,crossoverWaiting1,YES,,,0,S,3/10/2026,Passed First Reading.
+HB1601,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB1602,scheduled2,scheduled2,YES,,,0,H,2/23/2026,The committee(s) on FIN recommend(s) that the measure be deferred.
+HB1603,crossoverScheduled2,crossoverScheduled2,YES,,,0,S,4/1/2026,The committee on JDC deferred the measure.
+HB1604,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB1605,conferenceScheduled,conferenceScheduled,YES,,,0,H,4/30/2026,Conference Committee Meeting will reconvene on Friday 05-01-26 3:30PM in conference room 229.
+HB1606,waiting2,waiting2,YES,,,0,H,2/4/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on ECD with Representative(s) Alcos, Gedeon, Matsumoto, Reyes Oda, Shimizu voting aye with reservations; Representative(s) Amato, Garcia, Muraoka, Perruso, Pierick voting no (5) and Representative(s) Kitagawa excused (1)."
+HB1611,scheduled2,scheduled2,YES,,,0,H,2/18/2026,The committee(s) on JHA recommend(s) that the measure be deferred.
+HB1616,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB1617,waiting2,waiting2,YES,,,0,H,2/18/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on FIN with Representative(s) Reyes Oda voting aye with reservations; Representative(s) Alcos, Amato, Garcia, Gedeon, Matsumoto, Muraoka, Pierick voting no (7) and none excused (0)."
+HB1621,waiting2,waiting2,YES,,,0,H,2/11/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on FIN with none voting aye with reservations; Representative(s) Pierick voting no (1) and Representative(s) Holt excused (1).
+HB1652,scheduled2,scheduled2,YES,,,0,H,2/25/2026,The committee(s) on FIN recommend(s) that the measure be deferred.
+HB1699,introduced,introduced,YES,,,0,H,1/30/2026,This measure has been deleted from the meeting scheduled on Tuesday 02-03-26 9:00AM in conference room 329 VIA VIDEOCONFERENCE.
+HB1703,waiting3,waiting3,YES,,,0,H,2/18/2026,Report adopted; referred to the committee(s) on JHA as amended in HD 2 with none voting aye with reservations; none voting no (0) and none excused (0).
+HB1707,governorSigns,governorSigns,YES,,,0,S,6/4/2026,"Act 068, 06/03/2026 (Gov. Msg. No. 1168)."
+HB1737,governorSigns,governorSigns,YES,,,0,S,5/26/2026,"Act 034, 05/26/2026 (Gov. Msg. No. 1134)."
+HB1738,crossoverScheduled1,crossoverScheduled1,YES,,,0,S,3/19/2026,The committee on EIG deferred the measure.
+HB1747,scheduled1,scheduled1,YES,,,0,H,2/3/2026,The committee(s) on HSH recommend(s) that the measure be deferred.
+HB1754,introduced,introduced,YES,,,0,H,1/26/2026,"Referred to ECD, HLT, FIN, referral sheet 1"
+HB1766,introduced,introduced,YES,,,0,H,1/26/2026,"Referred to AGR/EEP, FIN, referral sheet 1"
+HB1779,crossoverWaiting1,crossoverWaiting1,YES,,,0,S,3/10/2026,Passed First Reading.
+HB1817,waiting2,waiting2,YES,,,0,H,2/20/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on JHA with none voting aye with reservations; none voting no (0) and Representative(s) Quinlan excused (1).
+HB1823,governorSigns,governorSigns,YES,false_negative,,0,S,6/4/2026,"Act 070, 06/03/2026 (Gov. Msg. No. 1170)."
+HB1828,scheduled1,scheduled1,YES,,,0,H,2/4/2026,The committee(s) on AGR recommend(s) that the measure be deferred.
+HB1830,introduced,introduced,YES,,,0,H,1/26/2026,"Referred to AGR, FIN, referral sheet 1"
+HB1831,crossoverWaiting1,crossoverWaiting1,YES,,,0,S,3/10/2026,"Referred to AEN/HHS, WAM."
+HB1832,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/24/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB1874,scheduled1,scheduled1,YES,,,0,H,2/5/2026,The committee(s) on LAB recommend(s) that the measure be deferred.
+HB1880,crossoverScheduled1,crossoverScheduled1,YES,,,0,S,3/25/2026,"The committee(s) on  AEN recommend(s) that the measure be PASSED, WITH AMENDMENTS.  The votes in AEN were as follows: 2 Aye(s): Senator(s) Gabbard, Rhoads; Aye(s) with reservations: none ; 3 No(es): Senator(s) Richards, DeCoite, Awa; and 0 Excused: none."
+HB1929,conferenceScheduled,conferenceScheduled,YES,,,0,S,4/29/2026,Conference committee meeting to reconvene on 04-30-26 9:30AM; Conference Room 325.
+HB1931,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to JDC/WAM."
+HB1951,waiting3,waiting3,YES,,,0,H,2/20/2026,Report adopted; referred to the committee(s) on FIN as amended in HD 2 with none voting aye with reservations; Representative(s) Pierick voting no (1) and Representative(s) Quinlan excused (1).
+HB1952,passedCommittees,passedCommittees,YES,,,0,S,4/16/2026,Received notice of disagreement (Hse. Com. No. 599).
+HB1953,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2014,introduced,introduced,YES,,,0,H,1/28/2026,"Referred to AGR, CPC, referral sheet 3"
+HB2015,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/24/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to CPN."
+HB2017,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2032,introduced,introduced,YES,,,0,H,1/28/2026,"Referred to ECD, FIN, referral sheet 3"
+HB2047,crossoverWaiting1,crossoverWaiting1,YES,false_negative,,0,S,3/23/2026,The committee(s) on WLA/HWN deleted the measure from the public hearing scheduled on 03-24-26 1:01PM; CR 224 & Videoconference.
+HB2119,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/24/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2135,introduced,introduced,YES,,,0,H,1/28/2026,"Referred to AGR, ECD, FIN, referral sheet 4"
+HB2139,crossoverScheduled2,crossoverScheduled2,YES,,,0,S,4/1/2026,The committee(s) on WAM deferred the measure until 04-06-26 10:31AM; Conference Room 211 & Videoconference.
+HB2152,governorSigns,governorSigns,YES,,,0,S,6/9/2026,"Act 114, 06/08/2026 (Gov. Msg. No. 1214)."
+HB2155,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/24/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2176,introduced,introduced,YES,,,0,H,1/30/2026,"Referred to LMG, FIN, referral sheet 5"
+HB2207,governorSigns,governorSigns,YES,,,0,S,6/5/2026,"Act 103, 06/05/2026 (Gov. Msg. No. 1203)."
+HB2208,conferenceScheduled,conferenceScheduled,YES,,,0,H,5/1/2026,Conference Committee Meeting will reconvene on Friday 05-01-26 5:05PM in conference room 329.
+HB2216,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,4/8/2026,The committee on WAM has deleted the measure from decision making scheduled on 04-09-26 10:55AM; CR 211 & Videoconference.
+HB2218,transmittedGovernor,transmittedGovernor,YES,false_negative,,1,S,5/8/2026,Received notice of passage on Final Reading in House (Hse. Com. No. 888).
+HB2229,waiting2,waiting2,YES,,,0,H,2/18/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on CPC with none voting aye with reservations; none voting no (0) and none excused (0).
+HB2233,crossoverWaiting1,crossoverWaiting1,YES,,,0,S,3/10/2026,Passed First Reading.
+HB2246,governorSigns,governorSigns,YES,,,0,S,6/5/2026,"Act 101, 06/05/2026 (Gov. Msg. No. 1201)."
+HB2296,transmittedGovernor,transmittedGovernor,YES,,,4,S,4/27/2026,Received notice of House agreement and passage on Final Reading (Hse. Com. No. 824).
+HB2300,governorSigns,governorSigns,YES,,,0,S,6/9/2026,"Act 116, 06/08/2026 (Gov. Msg. No. 1216)."
+HB2310,governorSigns,governorSigns,YES,,,0,S,5/21/2026,"Act 021, 05/21/2026 (Gov. Msg. No. 1121)."
+HB2317,introduced,introduced,YES,,,0,H,2/2/2026,"Referred to HLT, CPC, referral sheet 6"
+HB2338,transmittedGovernor,transmittedGovernor,YES,,,1,S,5/8/2026,Received notice of passage on Final Reading in House (Hse. Com. No. 888).
+HB2374,waiting2,waiting2,YES,,,0,H,2/12/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on WAL with none voting aye with reservations; none voting no (0) and none excused (0).
+HB2377,introduced,introduced,YES,false_negative,,0,H,2/2/2026,"Referred to AGR, WAL, FIN, referral sheet 6"
+HB2404,waiting2,waiting2,YES,,,0,H,2/20/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on JHA with none voting aye with reservations; none voting no (0) and Representative(s) Quinlan excused (1).
+HB2424,crossoverScheduled1,crossoverScheduled1,YES,,,0,S,3/19/2026,"The committee(s) on  EIG recommend(s) that the measure be PASSED, WITH AMENDMENTS.  The votes in EIG were as follows: 2 Aye(s): Senator(s) Wakai, Chang; Aye(s) with reservations: none ; 3 No(es): Senator(s) DeCoite, Richards, Fevella; and 0 Excused: none."
+HB2425,waiting2,waiting2,YES,,,0,H,2/6/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on WAL with Representative(s) Perruso, Poepoe voting aye with reservations; Representative(s) Amato, Cochran voting no (2) and none excused (0)."
+HB2457,waiting2,waiting2,YES,false_negative,,0,H,2/20/2026,"Re-referred to PBS, FIN, referral sheet 14"
+HB2458,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to CPN."
+HB2459,crossoverWaiting1,crossoverWaiting1,YES,,,0,S,3/10/2026,Passed First Reading.
+HB2495,introduced,introduced,YES,,,0,H,2/2/2026,"Referred to AGR, HSG, FIN, referral sheet 6"
+HB2496,introduced,introduced,YES,,,0,H,2/2/2026,"Referred to AGR, TRN, FIN, referral sheet 6"
+HB2497,waiting2,waiting2,YES,,,0,H,2/20/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on JHA with none voting aye with reservations; Representative(s) Pierick voting no (1) and Representative(s) Quinlan excused (1).
+HB2509,introduced,introduced,YES,false_negative,,0,H,2/2/2026,"Referred to HSH, FIN, referral sheet 6"
+HB2521,introduced,introduced,YES,,,0,H,2/2/2026,"Referred to ECD, FIN, referral sheet 6"
+HB2548,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2549,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2550,introduced,introduced,YES,,,0,H,2/2/2026,"Referred to AGR, JHA, FIN, referral sheet 6"
+HB2551,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 12:45 PM; Conference Room 325.
+HB2555,introduced,introduced,YES,,,0,H,2/2/2026,"Referred to ECD, FIN, referral sheet 6"
+HB2571,introduced,introduced,YES,,,0,H,2/2/2026,"Referred to AGR, FIN, referral sheet 6"
+HB2572,waiting2,waiting2,YES,,,0,H,2/20/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on FIN with none voting aye with reservations; Representative(s) Pierick voting no (1) and Representative(s) Quinlan excused (1).
+HB2573,waiting2,waiting2,YES,,,0,H,2/6/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on HED with none voting aye with reservations; none voting no (0) and none excused (0).
+HB2585,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2594,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/24/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2595,crossoverWaiting2,crossoverWaiting2,YES,,,0,S,3/24/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+HB2596,scheduled1,scheduled1,YES,,,0,H,2/6/2026,The committee(s) on AGR recommend(s) that the measure be deferred.
+HB2599,passedCommittees,passedCommittees,YES,false_negative,,0,H,4/21/2026,"House Conferees Appointed: Hashem, Morikawa Co-Chairs; Souza."
+HB2603,waiting2,waiting2,YES,false_negative,,0,H,2/12/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on WAL with none voting aye with reservations; none voting no (0) and none excused (0).
+HB2619,crossoverWaiting2,crossoverWaiting2,YES,false_negative,,0,S,3/30/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2002,crossoverWaiting2,crossoverWaiting2,YES,,,0,H,3/20/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on JHA with none voting aye with reservations; none voting no (0) and Representative(s) Quinlan excused (1).
+SB2006,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/12/2026,Pass First Reading
+SB2007,scheduled1,scheduled1,YES,,,0,S,2/17/2026,The committee on EIG deferred the measure.
+SB2015,introduced,introduced,YES,,,0,S,1/22/2026,"Referred to WLA/EIG, WAM."
+SB2019,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to JDC."
+SB2028,introduced,introduced,YES,,,0,S,1/22/2026,"Referred to AEN, WAM."
+SB2048,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to JDC/WAM."
+SB2085,introduced,introduced,YES,,,0,S,1/22/2026,"Referred to HHS, WAM."
+SB2094,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2095,conferenceScheduled,conferenceScheduled,YES,,,0,H,5/1/2026,"Conference Committee Meeting will reconvene on Friday, 05-01-26 at 12:30PM in Conference Room 325."
+SB2096,crossoverWaiting2,crossoverWaiting2,YES,,,0,H,3/19/2026,Passed Second Reading as amended in HD 1 and referred to the committee(s) on WAL with Representative(s) Cochran voting aye with reservations; none voting no (0) and none excused (0).
+SB2097,waiting2,waiting2,YES,,,0,S,2/13/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2098,waiting2,waiting2,YES,,,0,S,2/3/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2100,crossoverWaiting2,crossoverWaiting2,YES,,,0,H,3/30/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on FIN with none voting aye with reservations; none voting no (0) and Representative(s) Cochran, Lowen, Perruso, Quinlan excused (4)."
+SB2101,governorSigns,governorSigns,YES,,,0,S,6/26/2026,"Act 173, 06/26/2026 (Gov. Msg. No. 1275)."
+SB2102,conferenceScheduled,conferenceScheduled,YES,,,0,S,4/29/2026,Conference committee meeting to reconvene on 04-29-26 11:20 AM; Conference Room 325.
+SB2103,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/12/2026,Pass First Reading
+SB2104,introduced,introduced,YES,,,0,S,1/22/2026,"Referred to HHS/EIG, WAM."
+SB2109,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 3:30 PM; Conference Room 016.
+SB2110,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 12:45 PM; Conference Room 325.
+SB2112,waiting2,waiting2,YES,,,0,S,2/24/2026,"Re-Referred to AEN, CPN/WAM."
+SB2113,introduced,introduced,YES,,,0,S,1/22/2026,"Referred to GVO/AEN/PSM/HHS, WAM."
+SB2123,scheduled1,scheduled1,YES,,,0,S,2/2/2026,The committee on AEN deferred the measure.
+SB2126,waiting2,waiting2,YES,,,0,S,2/3/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2127,waiting2,waiting2,YES,,,0,S,2/13/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to JDC/WAM."
+SB2130,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2144,introduced,introduced,YES,,,0,S,1/22/2026,"Referred to EDU, WAM."
+SB2148,introduced,introduced,YES,,,0,S,1/22/2026,"Referred to HHS/CPN, WAM."
+SB2153,governorSigns,governorSigns,YES,,,0,S,6/26/2026,"Act 167, 06/26/2026 (Gov. Msg. No. 1269)."
+SB2154,waiting2,waiting2,YES,,,0,S,2/3/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2156,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2159,introduced,introduced,YES,,,0,S,1/22/2026,"Referred to EDT/AEN, WAM."
+SB2160,waiting2,waiting2,YES,,,0,S,2/3/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM/CPN."
+SB2161,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/12/2026,Pass First Reading
+SB2162,introduced,introduced,YES,,,0,S,1/26/2026,"Referred to WLA/HOU, WAM."
+SB2168,introduced,introduced,YES,,,0,S,1/26/2026,"Referred to EDU/AEN, WAM."
+SB2169,governorSigns,governorSigns,YES,,,0,S,6/26/2026,"Act 168, 06/26/2026 (Gov. Msg. No. 1270)."
+SB2170,waiting2,waiting2,YES,,,0,S,2/11/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2174,crossoverWaiting2,crossoverWaiting2,YES,,,0,H,3/24/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on JHA with Representative(s) Alcos, Cochran, Garcia voting aye with reservations; Representative(s) Pierick voting no (1) and Representative(s) Garrett, Quinlan excused (2)."
+SB2211,crossoverWaiting2,crossoverWaiting2,YES,,,0,H,3/24/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on FIN with none voting aye with reservations; none voting no (0) and Representative(s) Garrett, Quinlan excused (2)."
+SB2213,introduced,introduced,YES,false_negative,,0,S,1/26/2026,"Referred to EDU/AEN, WAM."
+SB2236,introduced,introduced,YES,,,0,S,1/26/2026,"Referred to HHS, CPN."
+SB2240,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/12/2026,Pass First Reading
+SB2258,waiting2,waiting2,YES,,,0,S,2/19/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2309,waiting2,waiting2,YES,,,0,S,2/11/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2317,waiting2,waiting2,YES,,,0,S,2/13/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2318,waiting2,waiting2,YES,,,0,S,2/11/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2319,conferenceScheduled,conferenceScheduled,YES,,,0,S,4/23/2026,Conference committee meeting scheduled for 04-24-26 11:00AM; Conference Room 325.
+SB2320,conferenceScheduled,conferenceScheduled,YES,,,0,H,5/1/2026,"Conference Committee Meeting will reconvene on Friday, 05-01-26 at 5:20PM in Conference Room 229."
+SB2321,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 12:45 PM; Conference Room 325.
+SB2323,waiting2,waiting2,YES,,,0,S,2/11/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2332,scheduled1,scheduled1,YES,,,0,S,2/11/2026,"The committee(s) on  AEN recommend(s) that the measure be PASSED, WITH AMENDMENTS.  The votes in AEN were as follows: 2 Aye(s): Senator(s) Gabbard, Rhoads; Aye(s) with reservations: none ; 3 No(es): Senator(s) Richards, DeCoite, Awa; and 0 Excused: none."
+SB2333,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to CPN/WAM."
+SB2334,scheduled1,scheduled1,YES,,,0,S,2/11/2026,The committee on AEN deferred the measure.
+SB2335,introduced,introduced,YES,,,0,S,1/26/2026,"Referred to EDT/AEN, WAM."
+SB2349,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2350,crossoverScheduled1,crossoverScheduled1,YES,,,0,H,3/18/2026,The committee(s) on AGR recommend(s) that the measure be deferred.
+SB2360,transmittedGovernor,transmittedGovernor,YES,,,0,S,5/8/2026,Enrolled to Governor.
+SB2371,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to CPN/JDC."
+SB2374,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2404,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to AEN, WAM."
+SB2405,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 12:45 PM; Conference Room 325.
+SB2406,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to AEN, CPN."
+SB2407,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 11:45 AM; Conference Room 411.
+SB2417,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to PSM/HHS, JDC/WAM."
+SB2427,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to HHS, WAM."
+SB2439,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to AEN, WAM/CPN."
+SB2440,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to WLA/AEN, WAM."
+SB2458,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to HHS/CPN, WAM."
+SB2459,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to AEN, CPN."
+SB2488,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2489,crossoverWaiting2,crossoverWaiting2,YES,,,0,H,3/24/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on JHA with Representative(s) Alcos, Gedeon, Matsumoto, Reyes Oda voting aye with reservations; Representative(s) Garcia voting no (1) and Representative(s) Garrett, Quinlan excused (2)."
+SB2576,scheduled1,scheduled1,YES,,,0,S,2/18/2026,The committee on AEN deferred the measure.
+SB2595,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 11:45 AM; Conference Room 411.
+SB2597,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to AEN, WAM."
+SB2615,passedCommittees,passedCommittees,YES,,,1,S,4/16/2026,Received from House (Hse. Com. No. 683).
+SB2677,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to EDU, WAM."
+SB2685,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to WLA, JDC."
+SB2689,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to EIG/AEN, WAM."
+SB2703,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to AEN, WAM."
+SB2704,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2705,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to EDU, WAM."
+SB2706,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 12:45 PM; Conference Room 325.
+SB2707,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to EDU/AEN, WAM."
+SB2708,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to EDU, WAM."
+SB2709,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2713,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/12/2026,Pass First Reading
+SB2716,scheduled1,scheduled1,YES,,,0,S,2/19/2026,The committee on EDT deferred the measure.
+SB2717,introduced,introduced,YES,,,0,S,1/28/2026,"Referred to AEN, JDC/WAM."
+SB2718,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2740,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to AEN/EIG/WLA, WAM/JDC."
+SB2741,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2742,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to AEN, JDC."
+SB2743,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to AEN/EIG, JDC."
+SB2745,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to WLA/AEN, WAM."
+SB2747,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to AEN/WLA, WAM."
+SB2760,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM/JDC."
+SB2779,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to AEN/WLA, WAM/CPN."
+SB2790,waiting2,waiting2,YES,,,0,S,2/17/2026,Report adopted; Passed Second Reading and referred to WAM.
+SB2792,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to HHS, WAM."
+SB2798,passedCommittees,passedCommittees,YES,,,0,H,4/21/2026,Received notice of Senate conferees (Sen. Com. No. 718).
+SB2800,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 12:45 PM; Conference Room 325.
+SB2802,governorSigns,governorSigns,YES,,,0,S,6/26/2026,"Act 154, 06/25/2026 (Gov. Msg. No. 1255)."
+SB2805,passedCommittees,passedCommittees,YES,,,0,H,4/20/2026,Received notice of Senate conferees (Sen. Com. No. 714).
+SB2885,crossoverScheduled1,crossoverScheduled1,YES,,,0,H,3/18/2026,The committee(s) on AGR recommend(s) that the measure be deferred.
+SB2887,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2890,introduced,introduced,YES,,,0,S,1/30/2026,Referred to WAM.
+SB2891,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to HHS, WAM."
+SB2922,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/12/2026,Pass First Reading
+SB2925,crossoverWaiting3,crossoverWaiting3,YES,,,0,H,3/30/2026,"Report adopted; referred to the committee(s) on FIN as amended in HD 2 with none voting aye with reservations; none voting no (0) and Representative(s) Cochran, Lowen, Perruso, Quinlan excused (4)."
+SB2935,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB2942,introduced,introduced,YES,,,0,S,2/8/2026,The committee(s) on AEN deleted the measure from the public hearing scheduled on 02-09-26 4:00PM; CR 224 & Videoconference.
+SB2972,conferenceScheduled,conferenceScheduled,YES,,,0,S,4/28/2026,Conference committee meeting to reconvene on 04-29-26 9:00AM; Conference Room 229.
+SB2973,crossoverWaiting2,crossoverWaiting2,YES,,,0,H,3/30/2026,"Passed Second Reading as amended in HD 1 and referred to the committee(s) on JHA with none voting aye with reservations; Representative(s) Garcia voting no (1) and Representative(s) Cochran, Lowen, Perruso, Quinlan excused (4)."
+SB2975,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/12/2026,Pass First Reading
+SB2977,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to WLA, WAM."
+SB2979,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to JDC."
+SB3043,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to JDC/WAM."
+SB3054,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to AEN, WAM."
+SB3056,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to PSM, WAM."
+SB3058,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to EDU, WAM."
+SB3060,introduced,introduced,YES,false_negative,,0,S,1/30/2026,"Referred to AEN/PSM, JDC."
+SB3063,conferenceScheduled,conferenceScheduled,YES,,,0,H,5/1/2026,Conference Committee Meeting will reconvene on Friday 05-01-26 4:00PM in conference room 229.
+SB3066,introduced,introduced,YES,,,0,S,1/30/2026,"Referred to AEN, WAM."
+SB3115,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to EDU, WAM."
+SB3119,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to EDU, WAM."
+SB3137,governorSigns,governorSigns,YES,,,0,S,6/9/2026,"Act 108, 06/08/2026 (Gov. Msg. No. 1208)."
+SB3158,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to EDU, WAM."
+SB3162,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB3197,introduced,introduced,YES,false_negative,,0,S,2/2/2026,"Referred to HHS/LBT, WAM."
+SB3221,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to TRS/AEN, WAM."
+SB3222,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to AEN, WAM."
+SB3224,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to AEN, JDC."
+SB3231,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/12/2026,Pass First Reading
+SB3232,crossoverWaiting1,crossoverWaiting1,YES,,,0,H,3/10/2026,Pass First Reading
+SB3233,conferenceScheduled,conferenceScheduled,YES,,,0,S,5/1/2026,Conference committee meeting to reconvene on 05-01-26 12:45 PM; Conference Room 325.
+SB3245,transmittedGovernor,transmittedGovernor,YES,,,0,S,5/8/2026,Enrolled to Governor.
+SB3256,waiting2,waiting2,YES,,,0,S,2/20/2026,"Report adopted; Passed Second Reading, as amended (SD 1) and referred to WAM."
+SB3257,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to EDU/HHS, WAM."
+SB3258,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to AEN, WAM."
+SB3296,scheduled2,scheduled2,YES,,,0,S,3/5/2026,The committee on WAM deferred the measure.
+SB3297,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to WLA/AEN, WAM."
+SB3298,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to WLA/AEN/EIG/EDT, WAM."
+SB3302,governorSigns,governorSigns,YES,,,0,S,6/9/2026,"Act 110, 06/08/2026 (Gov. Msg. No. 1210)."
+SB3318,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to AEN/EDU, WAM."
+SB3320,transmittedGovernor,transmittedGovernor,YES,,,0,S,5/8/2026,Enrolled to Governor.
+SB3321,introduced,introduced,YES,,,0,S,2/2/2026,"Referred to AEN, WAM."
+SB3323,scheduled1,scheduled1,YES,false_negative,,0,S,2/11/2026,The committee on WLA deferred the measure.
