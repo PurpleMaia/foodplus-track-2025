@@ -6,10 +6,11 @@
  * Only touches bill_versions / committee_reports; never rewrites the bills row
  * or status_updates.
  *
- * Run: node scripts/scraping/seed-versions-reports.js [--year 2025] [--limit N] [--force]
- *   --year N   restrict to one legislative year (default: all)
- *   --limit N  process at most N bills (smoke testing)
- *   --force    process bills even if they already look complete
+ * Run: node scripts/scraping/seed-versions-reports.js [--year 2025] [--limit N] [--bill HB1001] [--force]
+ *   --year N     restrict to one legislative year (default: all)
+ *   --limit N    process at most N bills (smoke testing)
+ *   --bill HBnnn target a single bill by number (implies --force; combine with --year)
+ *   --force      process bills even if they already look complete
  */
 import axios from 'axios';
 import { db } from '../../db/kysely/client.js';
@@ -28,16 +29,18 @@ import {
 } from '../../server/services/scraping/config.js';
 
 function parseArgs(argv) {
-  const args = { year: null, limit: null, force: false };
+  const args = { year: null, limit: null, bill: null, force: false };
   for (let i = 2; i < argv.length; i++) {
     if (argv[i] === '--year') args.year = Number(argv[++i]);
     else if (argv[i] === '--limit') args.limit = Number(argv[++i]);
+    else if (argv[i] === '--bill') args.bill = String(argv[++i]).toUpperCase();
     else if (argv[i] === '--force') args.force = true;
     else {
       console.error(`Unknown argument: ${argv[i]}`);
       process.exit(1);
     }
   }
+  if (args.bill) args.force = true; // explicitly targeted bills always re-run
   return args;
 }
 
@@ -128,6 +131,14 @@ async function main() {
     .orderBy('year')
     .orderBy('bill_number');
   if (args.year) query = query.where('year', '=', args.year);
+  // Stored bill_number carries draft suffixes ("HB1001 HD1 SD3 CD1"), so match
+  // the base number exactly or as the first token.
+  if (args.bill) {
+    query = query.where((eb) => eb.or([
+      eb('bill_number', '=', args.bill),
+      eb('bill_number', 'like', `${args.bill} %`),
+    ]));
+  }
   const allBills = await query.execute();
 
   const done = args.force ? new Set() : await computeDoneSet();
