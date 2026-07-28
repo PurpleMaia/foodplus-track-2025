@@ -84,6 +84,40 @@ async function upsertReports(billId, reports) {
   }
 }
 
+// windows-1252 is latin1 except 0x80-0x9F, which hold printable characters
+// (smart quotes, dashes, €, …). Node's TextDecoder leaves that range as raw
+// control chars, so we map it ourselves.
+const CP1252_C1 = {
+  '\x80': '€', '\x82': '‚', '\x83': 'ƒ', '\x84': '„',
+  '\x85': '…', '\x86': '†', '\x87': '‡', '\x88': 'ˆ',
+  '\x89': '‰', '\x8A': 'Š', '\x8B': '‹', '\x8C': 'Œ',
+  '\x8E': 'Ž', '\x91': '‘', '\x92': '’', '\x93': '“',
+  '\x94': '”', '\x95': '•', '\x96': '–', '\x97': '—',
+  '\x98': '˜', '\x99': '™', '\x9A': 'š', '\x9B': '›',
+  '\x9C': 'œ', '\x9E': 'ž', '\x9F': 'Ÿ',
+};
+
+// Decode a fetched document by its declared charset. Capitol documents are
+// typically windows-1252 (declared only in the meta tag, not the HTTP header);
+// decoding them as UTF-8 turns special characters into U+FFFD mojibake.
+export function decodeHtmlBuffer(buffer, contentTypeHeader) {
+  let charset = /charset=["']?([\w-]+)/i.exec(contentTypeHeader || '')?.[1];
+  if (!charset) {
+    // Charset meta tags are ASCII, so a latin1 peek at the head is safe.
+    const head = buffer.toString('latin1', 0, 1024);
+    charset = /charset=["']?([\w-]+)/i.exec(head)?.[1];
+  }
+  charset = (charset || 'utf-8').toLowerCase();
+  if (charset === 'windows-1252' || charset === 'iso-8859-1' || charset === 'latin1') {
+    return buffer.toString('latin1').replace(/[\x80-\x9F]/g, (c) => CP1252_C1[c] ?? c);
+  }
+  try {
+    return new TextDecoder(charset).decode(buffer);
+  } catch {
+    return buffer.toString('utf8');
+  }
+}
+
 async function fetchDocumentText(htmlLink) {
   const response = await axios.get(htmlLink, {
     headers: {
@@ -93,18 +127,20 @@ async function fetchDocumentText(htmlLink) {
     },
     timeout: INDIVIDUAL_TIMEOUT,
     maxRedirects: 5,
+    responseType: 'arraybuffer',
   });
-  const $ = cheerio.load(response.data);
+  const html = decodeHtmlBuffer(Buffer.from(response.data), response.headers?.['content-type']);
+  const $ = cheerio.load(html);
   return $('body').text().replace(/\s+/g, ' ').trim();
 }
 
-// Fetch raw HTML only for rows that don't have it yet. Each fetch is isolated
-// so one dead link doesn't stop the rest. A short delay keeps us polite.
-async function backfillRawHtml(table, billId) {
+// Fetch document text only for rows that don't have it yet. Each fetch is
+// isolated so one dead link doesn't stop the rest. A short delay keeps us polite.
+async function backfillOriginalText(table, billId) {
   const rows = await db.selectFrom(table)
     .select(['id', 'html_link'])
     .where('bill_id', '=', billId)
-    .where('raw_html', 'is', null)
+    .where('original_text', 'is', null)
     .execute();
 
   for (const row of rows) {
@@ -113,11 +149,11 @@ async function backfillRawHtml(table, billId) {
       await delay(1000);
       const text = await fetchDocumentText(row.html_link);
       await db.updateTable(table)
-        .set({ raw_html: text, updated_at: new Date() })
+        .set({ original_text: text, updated_at: new Date() })
         .where('id', '=', row.id)
         .execute();
     } catch (err) {
-      console.warn(`[VERSIONS] Failed to fetch raw HTML for ${table} row ${row.id} (${row.html_link}):`, err?.message || err);
+      console.warn(`[VERSIONS] Failed to fetch document text for ${table} row ${row.id} (${row.html_link}):`, err?.message || err);
     }
   }
 }
@@ -128,9 +164,13 @@ export async function saveVersionsAndReports(billId, billNumber, parsed) {
     await upsertVersions(billId, versions);
     await upsertReports(billId, reports);
     console.log(`[VERSIONS] ${billNumber}: upserted ${versions.length} versions, ${reports.length} reports`);
-    await backfillRawHtml('bill_versions', billId);
-    await backfillRawHtml('committee_reports', billId);
+    await backfillOriginalText('bill_versions', billId);
+    await backfillOriginalText('committee_reports', billId);
   } catch (err) {
     console.warn(`[VERSIONS] ${billNumber}: versions/reports step failed:`, err?.message || err);
+    // Rethrow so callers can count the failure; the scrape path isolates this
+    // call in its own try/catch, and the seed script marks the bill failed so
+    // a resumed run retries it.
+    throw err;
   }
 }

@@ -69,6 +69,31 @@ export interface BillTags {
   tag_id: string;
 }
 
+export interface BillVersions {
+  ai_summary: string | null;
+  bill_id: string;
+  created_at: Generated<Timestamp | null>;
+  html_link: string | null;
+  id: Generated<string>;
+  label: string;
+  original_text: string | null;
+  pdf_link: string | null;
+  updated_at: Generated<Timestamp | null>;
+}
+
+export interface CommitteeReports {
+  ai_summary: string | null;
+  bill_id: string;
+  created_at: Generated<Timestamp | null>;
+  html_link: string | null;
+  id: Generated<string>;
+  label: string;
+  original_text: string | null;
+  pdf_link: string | null;
+  report_code: string | null;
+  updated_at: Generated<Timestamp | null>;
+}
+
 export interface InviteTokens {
   accepted_at: Timestamp | null;
   created_at: Generated<Timestamp | null>;
@@ -79,6 +104,24 @@ export interface InviteTokens {
   status: Generated<string>;
   tenant_id: string;
   token: string;
+}
+
+export interface Legislators {
+  area: string | null;
+  chamber: string | null;
+  created_at: Generated<Timestamp>;
+  district: number | null;
+  email: string | null;
+  first_name: string | null;
+  id: Generated<string>;
+  in_office: Generated<boolean>;
+  last_name: string | null;
+  member_id: string;
+  party: string | null;
+  phone: string | null;
+  room: string | null;
+  term_ended: Timestamp | null;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface Members {
@@ -94,6 +137,13 @@ export interface OrgBills {
   bill_status: Generated<BillStatus>;
   tenant_id: string;
   updated_at: Generated<Timestamp | null>;
+}
+
+export interface OrgFollows {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  tenant_id: string;
+  user_id: string;
 }
 
 export interface PendingProposals {
@@ -159,9 +209,25 @@ export interface Tags {
 export interface Tenants {
   branding_config: Json | null;
   created_at: Generated<Timestamp | null>;
+  description: Generated<string>;
   id: Generated<string>;
   name: string;
+  public_board: Generated<boolean>;
   slug: string;
+}
+
+export interface Testimonies {
+  author_name: Generated<string>;
+  bill_id: string;
+  content_json: Generated<Json>;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  organization: Generated<string>;
+  position: Generated<string>;
+  submitted_at: Generated<Timestamp | null>;
+  tenant_id: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
 }
 
 export interface User {
@@ -198,13 +264,25 @@ export interface UserBills {
   user_id: string | null;
 }
 
+export interface UserPreferences {
+  ai_opt_in: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  kanban_detailed_view: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface DB {
   auth_key: AuthKey;
   bill_tags: BillTags;
+  bill_versions: BillVersions;
   bills: Bills;
+  committee_reports: CommitteeReports;
   invite_tokens: InviteTokens;
+  legislators: Legislators;
   members: Members;
   org_bills: OrgBills;
+  org_follows: OrgFollows;
   pending_proposals: PendingProposals;
   schema_migrations: SchemaMigrations;
   scraping_stats: ScrapingStats;
@@ -213,7 +291,9 @@ export interface DB {
   supervisor_users: SupervisorUsers;
   tags: Tags;
   tenants: Tenants;
+  testimonies: Testimonies;
   user: User;
   user_bill_preferences: UserBillPreferences;
   user_bills: UserBills;
+  user_preferences: UserPreferences;
 }
