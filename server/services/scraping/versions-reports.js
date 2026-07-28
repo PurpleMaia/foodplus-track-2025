@@ -168,5 +168,9 @@ export async function saveVersionsAndReports(billId, billNumber, parsed) {
     await backfillOriginalText('committee_reports', billId);
   } catch (err) {
     console.warn(`[VERSIONS] ${billNumber}: versions/reports step failed:`, err?.message || err);
+    // Rethrow so callers can count the failure; the scrape path isolates this
+    // call in its own try/catch, and the seed script marks the bill failed so
+    // a resumed run retries it.
+    throw err;
   }
 }
