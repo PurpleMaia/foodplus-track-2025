@@ -139,6 +139,13 @@ export interface OrgBills {
   updated_at: Generated<Timestamp | null>;
 }
 
+export interface OrgFollows {
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  tenant_id: string;
+  user_id: string;
+}
+
 export interface PendingProposals {
   approval_status: Generated<string | null>;
   approved_at: Timestamp | null;
@@ -202,9 +209,25 @@ export interface Tags {
 export interface Tenants {
   branding_config: Json | null;
   created_at: Generated<Timestamp | null>;
+  description: Generated<string>;
   id: Generated<string>;
   name: string;
+  public_board: Generated<boolean>;
   slug: string;
+}
+
+export interface Testimonies {
+  author_name: Generated<string>;
+  bill_id: string;
+  content_json: Generated<Json>;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  organization: Generated<string>;
+  position: Generated<string>;
+  submitted_at: Generated<Timestamp | null>;
+  tenant_id: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
 }
 
 export interface User {
@@ -259,6 +282,7 @@ export interface DB {
   legislators: Legislators;
   members: Members;
   org_bills: OrgBills;
+  org_follows: OrgFollows;
   pending_proposals: PendingProposals;
   schema_migrations: SchemaMigrations;
   scraping_stats: ScrapingStats;
@@ -267,6 +291,7 @@ export interface DB {
   supervisor_users: SupervisorUsers;
   tags: Tags;
   tenants: Tenants;
+  testimonies: Testimonies;
   user: User;
   user_bill_preferences: UserBillPreferences;
   user_bills: UserBills;
