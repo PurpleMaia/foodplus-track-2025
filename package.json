@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "cron:scrape": "node server/cron-scrape.js",
     "start": "node server/index.js",
-    "seed:legislators": "node server/scraping/legislators.js",
+    "seed:legislators": "node scripts/scraping/scrape-legislators.js",
+    "seed:committees": "node scripts/scraping/scrape-committees.js",
     "seed:versions": "node scripts/scraping/seed-versions-reports.js",
     "kysely-codegen": "kysely-codegen --dialect postgres --env-file ./.env --out-file db/generated.d.ts",
     "test": "node --test \"server/**/*.test.js\""

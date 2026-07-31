@@ -250,7 +250,7 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
       const isTimeout = error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT' ||
         error?.message?.toLowerCase().includes('timeout');
       const isNetworkError = error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' ||
-        error?.code === 'ECONNRESET' || error?.response?.status === 503 || error?.response?.status === 502 ||
+      error?.code === 'ECONNRESET' || error?.response?.status === 503 || error?.response?.status === 502 ||
         error?.response?.status === 500 || error?.response?.status === 504;
 
       if ((isTimeout || isNetworkError) && attempt < INDIVIDUAL_MAX_RETRIES) {
