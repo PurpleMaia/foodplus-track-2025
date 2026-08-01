@@ -16,6 +16,20 @@ const TERM_ENDED_RE = /Term of Office Ended:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i;
 
 const collapseWhitespace = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
+// The site cloaks emails with Cloudflare's obfuscation: the real address lives in a
+// hex `data-cfemail` string (and the `/cdn-cgi/l/email-protection#<hex>` href), while
+// the visible text is "[email protected]". The hex is a per-string XOR cipher — the
+// first byte is the key, each remaining byte pair XORs with it to recover an ASCII char.
+function decodeCfEmail(hex) {
+  if (!/^[0-9a-f]{4,}$/i.test(hex || '') || hex.length % 2 !== 0) return null;
+  const key = parseInt(hex.slice(0, 2), 16);
+  let out = '';
+  for (let i = 2; i < hex.length; i += 2) {
+    out += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16) ^ key);
+  }
+  return out.includes('@') ? out : null;
+}
+
 // "MM/DD/YYYY" -> "YYYY-MM-DD" for a Postgres date column. Returns null if unparseable.
 function toIsoDate(mdY) {
   const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(mdY?.trim() || '');
@@ -80,8 +94,14 @@ export function parseLegislators(html) {
       // Handles both "Phone/Fax: NNN" and "Phone: NNN" (captures the Phone number).
       const phoneMatch = /Phone(?:\/Fax)?:\s*([0-9-]+)/i.exec(addressText);
       const phone = phoneMatch ? phoneMatch[1] : null;
+      // Email: prefer a plain mailto: (older markup), else decode the Cloudflare
+      // `data-cfemail` obfuscation the site now uses for every address.
       const mailto = card.find('address a[href^="mailto:"]').attr('href');
-      const email = mailto ? mailto.replace(/^mailto:/i, '').trim() : null;
+      let email = mailto ? mailto.replace(/^mailto:/i, '').trim() : null;
+      if (!email) {
+        const cfHex = card.find('address .__cf_email__').first().attr('data-cfemail');
+        email = decodeCfEmail(cfHex);
+      }
 
       // Out-of-office: check the card text for the term-ended verbiage.
       const termMatch = TERM_ENDED_RE.exec(card.text());

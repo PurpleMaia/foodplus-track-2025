@@ -19,6 +19,13 @@ test('parses every card in the fixture without failures', () => {
   assert.equal(legislators.length, 3);
 });
 
+test('decodes Cloudflare-obfuscated emails (data-cfemail, no mailto: link)', () => {
+  // The fixture uses the live site's Cloudflare email cloaking, not mailto: links.
+  assert.equal(byMemberId('249').email, 'repalcos@capitol.hawaii.gov');
+  assert.equal(byMemberId('162').email, 'sendelacruz@capitol.hawaii.gov');
+  assert.equal(byMemberId('229').email, 'senelefante@capitol.hawaii.gov');
+});
+
 test('parses Dela Cruz (combined Phone/Fax)', () => {
   assert.deepEqual(byMemberId('162'), {
     member_id: '162',
