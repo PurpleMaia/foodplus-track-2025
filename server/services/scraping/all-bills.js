@@ -54,6 +54,20 @@ export function parseBillListHtml(html) {
 }
 
 /**
+ * Strip adopted draft markers (HD#/SD#/CD#) the list report appends to the bill
+ * number, returning the bare number the DB stores and the frontend expects.
+ * "HB1513 HD1" → "HB1513", "HB48 HD2 SD1 CD1" → "HB48". Bare input is unchanged.
+ * @param {string|null} billNumber
+ * @returns {string|null}
+ */
+export function normalizeBillNumber(billNumber) {
+  if (!billNumber) return billNumber;
+  // The bare number is the first whitespace-delimited token; the rest are
+  // draft markers (HD1, SD2, CD1) that change as the bill is amended.
+  return billNumber.trim().split(/\s+/)[0];
+}
+
+/**
  * Default list-HTML fetcher: plain axios GET against the data host. Extracted so
  * the fetch strategy can be swapped (e.g. a local Playwright/www fetcher) without
  * duplicating scrapeBills's retry/parse/alert orchestration.
@@ -174,17 +188,23 @@ export async function saveBills(bills) {
   console.log('[SAVE] First pass: finding existing bills...');
   for (const bill of bills) {
     try {
-      // Find existing bill by bill_number and bill_year constraint
+      // Identify the existing row by bill_url. bill_url is stable across
+      // amendments (it is keyed on the bare measure number, not the draft
+      // suffix) and carries its own UNIQUE constraint, so it is the reliable
+      // identity. Matching on (bill_number, year) breaks once a bill is amended:
+      // the report renders "HB1513 HD1" while the stored row is "HB1513", the
+      // lookup misses, and the insert then collides on the bill_url constraint.
       const existingBill = await db
         .selectFrom('bills')
         .select(['id', 'updated_at', 'food_related'])
-        .where('bill_number', '=', bill.bill_number)
-        .where('year', '=', bill.year)
+        .where('bill_url', '=', bill.bill_url)
         .limit(1)
         .executeTakeFirst();
 
       if (existingBill) {
-        // Update existing bill - no LLM call needed
+        // Update existing bill - no LLM call needed. bill_number is normalized to
+        // the bare form (no HD/SD/CD draft markers) so it stays current with the
+        // report without breaking (bill_number, year) identity or the frontend link.
         await db
           .updateTable('bills')
           .set({
@@ -193,6 +213,7 @@ export async function saveBills(bills) {
             committee_assignment: bill.committee_assignment,
             introducer: bill.introducer,
             bill_title: bill.bill_title,
+            bill_number: normalizeBillNumber(bill.bill_number) || null,
             updated_at: new Date(),
           })
           .where('id', '=', existingBill.id)
@@ -230,7 +251,9 @@ export async function saveBills(bills) {
             .values({
               bill_url: bill.bill_url,
               year: bill.year || null,
-              bill_number: bill.bill_number || null,
+              // Store the bare number (strip HD/SD/CD draft markers) so identity
+              // stays stable across amendments and the frontend link works.
+              bill_number: normalizeBillNumber(bill.bill_number) || null,
               bill_title: bill.bill_title || null,
               current_status_string: bill.current_status_string || null,
               description: bill.description,
