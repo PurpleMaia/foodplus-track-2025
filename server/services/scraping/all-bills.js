@@ -2,8 +2,8 @@ import { db } from '../../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { determineIfFoodRelated } from '../llmService.js';
-import { fetchListHtmlViaBrowser } from './playwright-list.js';
 import { sendAlertEmail } from '../notifications/cron-alerts.js';
+// import { fetchListHtmlViaBrowser } from './playwright-list.js'; // Playwright/www fallback — parked (see commented block below).
 import {
   getRandomUserAgent,
   delay,
@@ -55,10 +55,6 @@ export function parseBillListHtml(html) {
 
 /**
  * Scrape the main bill list page for the given URL, returning an array of bill objects with basic info. Retries on network errors or timeouts.
- *
- * The `data` host's report page crashes with HTTP 500 from time to time. When
- * that happens (after exhausting retries), we fall back to fetching the same
- * report from `www` via a real browser (Playwright), which clears Cloudflare.
  * @param {*} url
  * @returns
  */
@@ -82,6 +78,11 @@ export async function scrapeBills(url) {
       const bills = parseBillListHtml(response.data);
 
       console.log(`[ALL BILLS] Scraped ${bills.length} bills`);
+      await sendAlertEmail(
+        'data URL passed',
+        `The data.capitol.hawaii.gov bill-list report succeeded on attempt ${attempt} and scraped ${bills.length} bills.\n\n` +
+        `URL: ${url}`
+      );
       return bills;
     } catch (error) {
       lastError = error;
@@ -96,34 +97,32 @@ export async function scrapeBills(url) {
         continue;
       }
 
-      // data-host retries exhausted. If this was a 500 (the known upstream crash),
-      // alert, then try the Playwright/www fallback before giving up.
-      if (error?.response?.status === 500) {
-        await sendAlertEmail(
-          'data URL failed (HTTP 500)',
-          `The data.capitol.hawaii.gov bill-list report returned HTTP 500 after ${attempt} attempt(s).\n\n` +
-          `URL: ${url}\n\n` +
-          `Attempting the Playwright/www fallback...`
-        );
-
-        try {
-          const html = await fetchListHtmlViaBrowser(url);
-          const bills = parseBillListHtml(html);
-          console.log(`[ALL BILLS] Scraped ${bills.length} bills via Playwright fallback`);
-
-          const wwwUrl = url.replace('data.capitol.hawaii.gov', 'www.capitol.hawaii.gov');
-          await sendAlertEmail(
-            'www URL passed (Playwright fallback)',
-            `The Playwright fallback against www.capitol.hawaii.gov succeeded and scraped ${bills.length} bills.\n\n` +
-            `URL: ${wwwUrl}`
-          );
-
-          return bills;
-        } catch (fallbackError) {
-          console.error(`[ALL BILLS] Playwright fallback also failed:`, fallbackError.message);
-          throw fallbackError;
-        }
-      }
+      // --- PARKED: Playwright/www fallback on the known HTTP 500 upstream crash. ---
+      // Kept as commented code (with playwright-list.js) in case the data host's
+      // recurring 500 returns. Re-enable by uncommenting the fetchListHtmlViaBrowser
+      // import above and this block. NOTE: www is behind Cloudflare and was returning
+      // 403 to headless Chromium from the Dokku host — revisit before relying on it.
+      // if (error?.response?.status === 500) {
+      //   await sendAlertEmail(
+      //     'data URL failed (HTTP 500)',
+      //     `The data.capitol.hawaii.gov bill-list report returned HTTP 500 after ${attempt} attempt(s).\n\n` +
+      //     `URL: ${url}\n\nAttempting the Playwright/www fallback...`
+      //   );
+      //   try {
+      //     const html = await fetchListHtmlViaBrowser(url);
+      //     const bills = parseBillListHtml(html);
+      //     console.log(`[ALL BILLS] Scraped ${bills.length} bills via Playwright fallback`);
+      //     const wwwUrl = url.replace('data.capitol.hawaii.gov', 'www.capitol.hawaii.gov');
+      //     await sendAlertEmail(
+      //       'www URL passed (Playwright fallback)',
+      //       `The Playwright fallback against www.capitol.hawaii.gov succeeded and scraped ${bills.length} bills.\n\nURL: ${wwwUrl}`
+      //     );
+      //     return bills;
+      //   } catch (fallbackError) {
+      //     console.error(`[ALL BILLS] Playwright fallback also failed:`, fallbackError.message);
+      //     throw fallbackError;
+      //   }
+      // }
 
       console.error(`[ALL BILLS] Failed after ${attempt} attempt(s):`, error.message);
       throw error;

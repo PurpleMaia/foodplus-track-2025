@@ -22,14 +22,7 @@ notifications (status digests + deadline warnings).
   classifies, then sends notifications. Runs **once/day**; there is no local scheduler (running the
   dev server does NOT fire the cron).
 - **Deploy:** push-to-deploy via Dokku. `dev` branch → sandbox, `main` → production
-  (`.github/workflows/`). The bill-list scraper falls back to Playwright/Chromium when the
-  `data` host 500s, so the Dokku app needs browser support: `.buildpacks` runs
-  `heroku-buildpack-apt` (installs `Aptfile`'s Chromium libs) before Node, `postinstall` runs
-  `playwright install chromium`, and the app **must** have
-  `PLAYWRIGHT_BROWSERS_PATH=/app/.cache/ms-playwright` set (`dokku config:set`) so the browser
-  downloaded at build time is found at runtime. Set this per app (sandbox AND production).
-  See **`docs/deployment-config.md`** for the full per-app env-var + buildpack checklist and how
-  sandbox differs from prod.
+  (`.github/workflows/`).
 
 ## Commands
 
