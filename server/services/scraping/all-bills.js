@@ -2,7 +2,7 @@ import { db } from '../../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { determineIfFoodRelated } from '../llmService.js';
-import { sendAlertEmail } from '../notifications/cron-alerts.js';
+// import { sendAlertEmail } from '../notifications/cron-alerts.js'; // only needed by the parked Playwright fallback block below.
 // import { fetchListHtmlViaBrowser } from './playwright-list.js'; // Playwright/www fallback — parked (see commented block below).
 import {
   getRandomUserAgent,
@@ -109,16 +109,6 @@ export async function scrapeBills(url, { fetchListHtml = fetchListHtmlViaAxios }
       const bills = parseBillListHtml(html);
 
       console.log(`[ALL BILLS] Scraped ${bills.length} bills`);
-      // Only announce a genuine data-host success. When a caller injects a
-      // different fetcher (e.g. the local Playwright/www recovery scraper), the
-      // data URL did NOT pass — sending this would be a false positive.
-      if (fetchListHtml === fetchListHtmlViaAxios) {
-        await sendAlertEmail(
-          'data URL passed',
-          `The data.capitol.hawaii.gov bill-list report succeeded on attempt ${attempt} and scraped ${bills.length} bills.\n\n` +
-          `URL: ${url}`
-        );
-      }
       return bills;
     } catch (error) {
       lastError = error;
