@@ -23,9 +23,11 @@
  * Intended to be driven by a LOCAL cron. Requires DATABASE_URL, OPENAI_API_KEY,
  * RESEND_API_KEY etc. in the local .env — this DOES send real notification emails.
  */
+import axios from 'axios';
 import { chromium } from 'playwright';
 import { startScraping } from '../../server/services/scrapingService.js';
-import { getRandomUserAgent, MAIN_LIST_TIMEOUT } from '../../server/services/scraping/config.js';
+import { scrapeBills, fetchListHtmlViaAxios } from '../../server/services/scraping/all-bills.js';
+import { getRandomUserAgent, MAIN_LIST_TIMEOUT, INDIVIDUAL_TIMEOUT } from '../../server/services/scraping/config.js';
 import { sendAlertEmail } from '../../server/services/notifications/cron-alerts.js';
 import { sendStatusChangeNotifications } from '../../server/services/notificationService.js';
 import { checkApproachingDeadlines, sendDeadlineWarnings } from '../../server/services/notifications/deadline-warnings.js';
@@ -69,6 +71,106 @@ async function scrapeChamber(label, url) {
     console.warn(`[MAIN] ${label} data-URL scrape failed (${dataError.message}). Falling back to Playwright/www...`);
     return await startScraping(url, { fetchListHtml: fetchListHtmlViaBrowser });
   }
+}
+
+// How many individual bills to test-fetch per chamber in a dry run. Fetching all
+// ~3000 would hammer the host; a sample is enough to confirm the URL resolves.
+const DRY_RUN_INDIVIDUAL_LIMIT = Number(
+  process.argv.slice(2).find((a) => a.startsWith('--individual-limit='))?.split('=')[1] ?? 5
+);
+
+/**
+ * Fetch one individual bill page the SAME way individual-bill.js does — derive
+ * the URL from the list's bill_url via `.replace("www.", "data.")` — but do NOT
+ * touch the DB. Returns { url, ok, status/error } so the dry run can report it.
+ */
+async function tryIndividualFetch(billUrl) {
+  // Mirror individual-bill.js:72 exactly — this is the derivation under test.
+  const updatedUrl = billUrl.replace('www.', 'data.');
+  try {
+    const response = await axios.get(updatedUrl, {
+      headers: {
+        'User-Agent': getRandomUserAgent(),
+        Accept: 'text/html',
+        Referer: 'https://data.capitol.hawaii.gov',
+      },
+      timeout: INDIVIDUAL_TIMEOUT,
+      maxRedirects: 5,
+    });
+    return { url: updatedUrl, ok: true, status: response.status };
+  } catch (error) {
+    return { url: updatedUrl, ok: false, status: error?.response?.status, error: error?.message };
+  }
+}
+
+/**
+ * DRY RUN: fetch + parse the bill list, then test-fetch a SAMPLE of individual
+ * bill pages. No DB writes (no saveBills, no status inserts), no emails. Proves
+ * the list scrape AND the individual-bill URL derivation actually resolve.
+ * Uses the SAME scrapeBills fetch+parse the real pipeline uses.
+ */
+async function dryRun() {
+  const currentYear = new Date().getFullYear();
+  console.log(`[DRY RUN] Scrape-only, no DB writes, no emails — year ${currentYear}\n`);
+
+  const urls = {
+    House: `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=hb&title=House%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`,
+    Senate: `https://data.capitol.hawaii.gov/advreports/advreport.aspx?year=${currentYear}&report=deadline&active=true&rpt_type=&measuretype=sb&title=Senate%20Bills%20with%20Action%20Taken%20in%20${currentYear}%20Only`,
+  };
+
+  let ok = true;
+  for (const [label, url] of Object.entries(urls)) {
+    console.log(`[DRY RUN] ${label} — scraping: ${url}`);
+    let bills;
+    let via = 'data URL';
+    try {
+      // Wrap the axios fetcher so it is NOT identical to the default — this
+      // bypasses scrapeBills's "data URL passed" success email in the dry run.
+      bills = await scrapeBills(url, { fetchListHtml: (u) => fetchListHtmlViaAxios(u) });
+    } catch (dataError) {
+      const wwwUrl = url.replace('data.capitol.hawaii.gov', 'www.capitol.hawaii.gov');
+      console.warn(`[DRY RUN] ${label} data-URL scrape failed (${dataError.message}). Falling back to Playwright/www: ${wwwUrl}`);
+      via = 'Playwright/www';
+      bills = await scrapeBills(url, { fetchListHtml: fetchListHtmlViaBrowser });
+    }
+
+    console.log(`[DRY RUN] ${label}: parsed ${bills.length} bills via ${via}`);
+    if (bills.length === 0) {
+      ok = false;
+      console.error(`[DRY RUN] ${label}: 0 bills — scrape did NOT work (empty parse / challenge page).`);
+      console.log('');
+      continue;
+    }
+
+    const sample = bills[0];
+    console.log(`[DRY RUN] ${label} sample: ${sample.bill_number} (${sample.year}) — ${sample.bill_title}`);
+    console.log(`[DRY RUN]   list stored bill_url: ${sample.bill_url}`);
+
+    // Test-fetch a sample of individual bill pages using the SAME URL derivation
+    // individual-bill.js uses. Prints each URL and whether the fetch succeeded.
+    const toTest = bills.slice(0, DRY_RUN_INDIVIDUAL_LIMIT);
+    console.log(`[DRY RUN] ${label}: test-fetching ${toTest.length} individual bill page(s)...`);
+    let indivOk = 0;
+    let indivFail = 0;
+    for (const bill of toTest) {
+      const result = await tryIndividualFetch(bill.bill_url);
+      if (result.ok) {
+        indivOk++;
+        console.log(`[DRY RUN]   ✅ ${bill.bill_number} — HTTP ${result.status} — ${result.url}`);
+      } else {
+        indivFail++;
+        console.error(`[DRY RUN]   ❌ ${bill.bill_number} — ${result.status ? `HTTP ${result.status}` : result.error} — ${result.url}`);
+      }
+    }
+    console.log(`[DRY RUN] ${label}: individual fetch ${indivOk} ok, ${indivFail} failed (of ${toTest.length} sampled)`);
+    if (indivFail > 0) ok = false;
+    console.log('');
+  }
+
+  console.log(ok
+    ? '[DRY RUN] ✅ List scrape + sampled individual fetches all succeeded. No data was written.'
+    : '[DRY RUN] ❌ Something failed (0 bills, or an individual fetch failed). See above. No data was written.');
+  return ok;
 }
 
 async function cronScrape() {
@@ -170,19 +272,31 @@ async function cronScrape() {
   }
 }
 
-cronScrape()
-  .then(() => process.exit(0))
-  .catch(async (error) => {
-    console.error('Error during recovery cron:', error);
+const DRY_RUN = process.argv.slice(2).includes('--dry-run');
 
-    await sendAlertEmail('Cron job CRASHED (recovery cron)', [
-      `The recovery scrape crashed at ${new Date().toISOString()}.`,
-      '',
-      `Error: ${error?.message || error}`,
-      '',
-      `Stack trace:`,
-      error?.stack || 'No stack trace available',
-    ].join('\n'));
+if (DRY_RUN) {
+  // Scrape-only: no DB writes, no emails. Exit 0 if both chambers parsed bills.
+  dryRun()
+    .then((ok) => process.exit(ok ? 0 : 1))
+    .catch((error) => {
+      console.error('[DRY RUN] Fatal:', error);
+      process.exit(1);
+    });
+} else {
+  cronScrape()
+    .then(() => process.exit(0))
+    .catch(async (error) => {
+      console.error('Error during recovery cron:', error);
 
-    process.exit(1);
-  });
+      await sendAlertEmail('Cron job CRASHED (recovery cron)', [
+        `The recovery scrape crashed at ${new Date().toISOString()}.`,
+        '',
+        `Error: ${error?.message || error}`,
+        '',
+        `Stack trace:`,
+        error?.stack || 'No stack trace available',
+      ].join('\n'));
+
+      process.exit(1);
+    });
+}
