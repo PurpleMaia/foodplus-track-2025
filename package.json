@@ -15,7 +15,7 @@
     "seed:versions": "node scripts/scraping/seed-versions-reports.js",
     "kysely-codegen": "kysely-codegen --dialect postgres --env-file ./.env --out-file db/generated.d.ts",
     "test": "node --test \"server/**/*.test.js\"",
-    "postinstall": "playwright install --with-deps chromium"
+    "postinstall": "playwright install chromium"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.7",
