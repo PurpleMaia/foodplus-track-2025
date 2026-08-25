@@ -54,11 +54,36 @@ export function parseBillListHtml(html) {
 }
 
 /**
+ * Default list-HTML fetcher: plain axios GET against the data host. Extracted so
+ * the fetch strategy can be swapped (e.g. a local Playwright/www fetcher) without
+ * duplicating scrapeBills's retry/parse/alert orchestration.
+ * @param {string} url
+ * @returns {Promise<string>} the report page HTML
+ */
+export async function fetchListHtmlViaAxios(url) {
+  const response = await axios.get(url, {
+    headers: {
+      'User-Agent': getRandomUserAgent(),
+      Accept: 'text/html',
+      Referer: 'https://data.capitol.hawaii.gov',
+    },
+    timeout: MAIN_LIST_TIMEOUT,
+    maxRedirects: 5,
+  });
+  return response.data;
+}
+
+/**
  * Scrape the main bill list page for the given URL, returning an array of bill objects with basic info. Retries on network errors or timeouts.
- * @param {*} url
+ * @param {string} url
+ * @param {object} [options]
+ * @param {(url: string) => Promise<string>} [options.fetchListHtml] - fetch strategy for the
+ *   report HTML. Defaults to axios against the data host; a local recovery scraper can pass a
+ *   Playwright fetcher to reach the Cloudflare-fronted www host. Errors it throws flow through
+ *   the same retry loop below.
  * @returns
  */
-export async function scrapeBills(url) {
+export async function scrapeBills(url, { fetchListHtml = fetchListHtmlViaAxios } = {}) {
   let lastError;
 
   for (let attempt = 1; attempt <= MAIN_LIST_MAX_RETRIES; attempt++) {
@@ -66,23 +91,20 @@ export async function scrapeBills(url) {
       console.log(`[ALL BILLS] Scraping main bill list (attempt ${attempt}/${MAIN_LIST_MAX_RETRIES})...`);
       await delay(attempt === 1 ? 1000 : MAIN_LIST_RETRY_DELAY);
 
-      const response = await axios.get(url, {
-        headers: {
-          'User-Agent': getRandomUserAgent(),
-          Accept: 'text/html',
-          Referer: 'https://data.capitol.hawaii.gov',
-        },
-        timeout: MAIN_LIST_TIMEOUT,
-        maxRedirects: 5,
-      });
-      const bills = parseBillListHtml(response.data);
+      const html = await fetchListHtml(url);
+      const bills = parseBillListHtml(html);
 
       console.log(`[ALL BILLS] Scraped ${bills.length} bills`);
-      await sendAlertEmail(
-        'data URL passed',
-        `The data.capitol.hawaii.gov bill-list report succeeded on attempt ${attempt} and scraped ${bills.length} bills.\n\n` +
-        `URL: ${url}`
-      );
+      // Only announce a genuine data-host success. When a caller injects a
+      // different fetcher (e.g. the local Playwright/www recovery scraper), the
+      // data URL did NOT pass — sending this would be a false positive.
+      if (fetchListHtml === fetchListHtmlViaAxios) {
+        await sendAlertEmail(
+          'data URL passed',
+          `The data.capitol.hawaii.gov bill-list report succeeded on attempt ${attempt} and scraped ${bills.length} bills.\n\n` +
+          `URL: ${url}`
+        );
+      }
       return bills;
     } catch (error) {
       lastError = error;

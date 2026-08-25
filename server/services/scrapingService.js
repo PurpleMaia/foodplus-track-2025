@@ -38,7 +38,7 @@ export async function main() {
  * Start the full scraping process by scraping the full page of the House/Senate website, then trigger an individual scrape for each of those bills. Returns full scrape metadata. 
  * @param {*} url 
  */
-export async function startScraping(url) {
+export async function startScraping(url, options = {}) {
   let billCount = 0;
   let individualSuccessCount = 0;
   let individualFailCount = 0;
@@ -47,7 +47,7 @@ export async function startScraping(url) {
   const startTime = Date.now(); // function-scoped so the catch block can compute duration too
 
   try {
-    const bills = await scrapeBills(url);
+    const bills = await scrapeBills(url, options);
     billCount = bills.length;
 
     // return bill ids for scraping individual bills
