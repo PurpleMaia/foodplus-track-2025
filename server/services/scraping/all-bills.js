@@ -2,6 +2,8 @@ import { db } from '../../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { determineIfFoodRelated } from '../llmService.js';
+import { fetchListHtmlViaBrowser } from './playwright-list.js';
+import { sendAlertEmail } from '../notifications/cron-alerts.js';
 import {
   getRandomUserAgent,
   delay,
@@ -11,9 +13,54 @@ import {
 } from './config.js';
 
 /**
+ * Parse the main bill-list report HTML into an array of bill objects. Pure: no
+ * network, no DB. Works on HTML from either the axios (`data`) path or the
+ * Playwright (`www`) fallback, since both render the same report table.
+ * @param {string} html
+ * @returns {Array<object>}
+ */
+export function parseBillListHtml(html) {
+  const $ = cheerio.load(html);
+  const bills = [];
+  const rows = $('table tr').toArray().slice(1); // Skip header row
+
+  for (const element of rows) {
+    const billLink = $(element).find('a.report');
+    const billUrl = billLink.attr('href');
+    if (!billUrl) continue;
+
+    const billNumber = billLink.text().trim();
+    const billYear = new URL(billUrl, 'https://data.capitol.hawaii.gov').searchParams.get('year');
+    const measureStatus = $(element).find('td:nth-child(2) span');
+    const measureTitle = measureStatus.eq(2).text().trim();
+    const description = measureStatus.eq(3).text().trim();
+    const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
+    const introducers = $(element).find('td:nth-child(4)').text().trim();
+    const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
+
+    bills.push({
+      bill_url: billUrl,
+      bill_number: billNumber,
+      year: billYear,
+      bill_title: measureTitle,
+      description: description,
+      current_status_string: currentStatus,
+      committee_assignment: committeeAssignment,
+      introducer: introducers,
+    });
+  }
+
+  return bills;
+}
+
+/**
  * Scrape the main bill list page for the given URL, returning an array of bill objects with basic info. Retries on network errors or timeouts.
- * @param {*} url 
- * @returns 
+ *
+ * The `data` host's report page crashes with HTTP 500 from time to time. When
+ * that happens (after exhausting retries), we fall back to fetching the same
+ * report from `www` via a real browser (Playwright), which clears Cloudflare.
+ * @param {*} url
+ * @returns
  */
 export async function scrapeBills(url) {
   let lastError;
@@ -32,35 +79,7 @@ export async function scrapeBills(url) {
         timeout: MAIN_LIST_TIMEOUT,
         maxRedirects: 5,
       });
-      const $ = cheerio.load(response.data);
-      const bills = [];
-      const rows = $('table tr').toArray().slice(1); // Skip header row
-
-      for (const element of rows) {
-        const billLink = $(element).find('a.report');
-        const billUrl = billLink.attr('href');
-        const billNumber = billLink.text().trim();
-        const billYear = new URL(billUrl, 'https://data.capitol.hawaii.gov').searchParams.get('year');
-        const measureStatus = $(element).find('td:nth-child(2) span');
-        const measureTitle = measureStatus.eq(2).text().trim();
-        const description = measureStatus.eq(3).text().trim();
-        const currentStatus = $(element).find('td:nth-child(3)').text().trim().replace(/\n\s*/g, ' ');
-        const introducers = $(element).find('td:nth-child(4)').text().trim();
-        const committeeAssignment = $(element).find('td:nth-child(5)').text().trim();
-
-        if (billUrl) {
-          bills.push({
-            bill_url: billUrl,
-            bill_number: billNumber,
-            year: billYear,
-            bill_title: measureTitle,
-            description: description,
-            current_status_string: currentStatus,
-            committee_assignment: committeeAssignment,
-            introducer: introducers,
-          });
-        }
-      }
+      const bills = parseBillListHtml(response.data);
 
       console.log(`[ALL BILLS] Scraped ${bills.length} bills`);
       return bills;
@@ -68,12 +87,42 @@ export async function scrapeBills(url) {
       lastError = error;
       const isTimeout = error?.code === 'ECONNABORTED' || error?.code === 'ETIMEDOUT' ||
         error?.message?.toLowerCase().includes('timeout');
-      const isNetworkError = error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND' ||
-        error?.response?.status === 503 || error?.response?.status === 502;
+      const isServerError = error?.response?.status === 503 || error?.response?.status === 502 ||
+        error?.response?.status === 500;
+      const isNetworkError = error?.code === 'ECONNREFUSED' || error?.code === 'ENOTFOUND';
 
-      if ((isTimeout || isNetworkError) && attempt < MAIN_LIST_MAX_RETRIES) {
+      if ((isTimeout || isServerError || isNetworkError) && attempt < MAIN_LIST_MAX_RETRIES) {
         console.warn(`[ALL BILLS] Attempt ${attempt} failed (${error.message}). Retrying in ${MAIN_LIST_RETRY_DELAY / 1000}s...`);
         continue;
+      }
+
+      // data-host retries exhausted. If this was a 500 (the known upstream crash),
+      // alert, then try the Playwright/www fallback before giving up.
+      if (error?.response?.status === 500) {
+        await sendAlertEmail(
+          'data URL failed (HTTP 500)',
+          `The data.capitol.hawaii.gov bill-list report returned HTTP 500 after ${attempt} attempt(s).\n\n` +
+          `URL: ${url}\n\n` +
+          `Attempting the Playwright/www fallback...`
+        );
+
+        try {
+          const html = await fetchListHtmlViaBrowser(url);
+          const bills = parseBillListHtml(html);
+          console.log(`[ALL BILLS] Scraped ${bills.length} bills via Playwright fallback`);
+
+          const wwwUrl = url.replace('data.capitol.hawaii.gov', 'www.capitol.hawaii.gov');
+          await sendAlertEmail(
+            'www URL passed (Playwright fallback)',
+            `The Playwright fallback against www.capitol.hawaii.gov succeeded and scraped ${bills.length} bills.\n\n` +
+            `URL: ${wwwUrl}`
+          );
+
+          return bills;
+        } catch (fallbackError) {
+          console.error(`[ALL BILLS] Playwright fallback also failed:`, fallbackError.message);
+          throw fallbackError;
+        }
       }
 
       console.error(`[ALL BILLS] Failed after ${attempt} attempt(s):`, error.message);
