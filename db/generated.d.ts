@@ -58,6 +58,7 @@ export interface Bills {
   id: Generated<string>;
   introducer: string | null;
   nickname: string | null;
+  search_vector: Generated<string | null>;
   updated_at: Generated<Timestamp | null>;
   year: number | null;
 }
@@ -78,6 +79,20 @@ export interface BillVersions {
   label: string;
   original_text: string | null;
   pdf_link: string | null;
+  summary_generated_at: Timestamp | null;
+  summary_prompt_version: string | null;
+  updated_at: Generated<Timestamp | null>;
+}
+
+export interface CommitteeChairs {
+  committee_id: string;
+  created_at: Generated<Timestamp | null>;
+  ended_at: Timestamp | null;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  legislator_id: string;
+  role: string;
+  started_at: Generated<Timestamp>;
   updated_at: Generated<Timestamp | null>;
 }
 
@@ -91,6 +106,18 @@ export interface CommitteeReports {
   original_text: string | null;
   pdf_link: string | null;
   report_code: string | null;
+  summary_generated_at: Timestamp | null;
+  summary_prompt_version: string | null;
+  updated_at: Generated<Timestamp | null>;
+}
+
+export interface Committees {
+  acronym: string;
+  chamber: string | null;
+  created_at: Generated<Timestamp | null>;
+  id: Generated<string>;
+  is_active: Generated<boolean>;
+  name: string;
   updated_at: Generated<Timestamp | null>;
 }
 
@@ -143,6 +170,15 @@ export interface OrgFollows {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   tenant_id: string;
+  user_id: string;
+}
+
+export interface PasswordResetTokens {
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  id: Generated<string>;
+  token_hash: string;
+  used_at: Timestamp | null;
   user_id: string;
 }
 
@@ -277,12 +313,15 @@ export interface DB {
   bill_tags: BillTags;
   bill_versions: BillVersions;
   bills: Bills;
+  committee_chairs: CommitteeChairs;
   committee_reports: CommitteeReports;
+  committees: Committees;
   invite_tokens: InviteTokens;
   legislators: Legislators;
   members: Members;
   org_bills: OrgBills;
   org_follows: OrgFollows;
+  password_reset_tokens: PasswordResetTokens;
   pending_proposals: PendingProposals;
   schema_migrations: SchemaMigrations;
   scraping_stats: ScrapingStats;
