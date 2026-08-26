@@ -9,6 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "cron:scrape": "node server/cron-scrape.js",
+    "scrape:recover": "node scrape.js",
+    "scrape:dry-run": "node scrape.js --dry-run",
     "start": "node server/index.js",
     "seed:legislators": "node scripts/scraping/scrape-legislators.js",
     "seed:committees": "node scripts/scraping/scrape-committees.js",

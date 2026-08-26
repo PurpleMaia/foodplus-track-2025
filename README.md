@@ -43,8 +43,62 @@ This project is a web dashboard and scraper for tracking bills from the Hawaii S
 - `npm run build` – build the production bundle
 - `npm run preview` – preview the built app locally
 - `npm run lint` – run ESLint over the project
-- `npm run scrape` – run the scraper script (requires a `server/scraper.js` file)
+- `npm run cron:scrape` – run the full daily scrape → classify → notify pipeline
+- `npm run scrape:recover` – run the same pipeline locally with a Playwright fallback (see below)
+- `npm run scrape:dry-run` – scrape only, no DB writes and no emails (see below)
+- `npm test` – run the backend test suite (`node --test`)
 - `npm start` – start the Express server to serve the production build
+
+## Recovery scraper (`scrape.js`)
+
+`scrape.js` (repo root) is a **local** copy of the daily scrape pipeline that is
+resilient to the Capitol data host going down. The deployed daily cron
+(`npm run cron:scrape`) scrapes `data.capitol.hawaii.gov`; that host intermittently
+returns **HTTP 500**. When it does, run `scrape.js` from your own machine and it
+falls back to the `www.capitol.hawaii.gov` copy of the report via a real browser
+(Playwright/Chromium), which clears the Cloudflare challenge a datacenter IP cannot.
+
+Everything downstream of the list fetch — individual bill scrapes, status
+classification, DB writes, follower notifications and deadline warnings — runs
+through the exact same service code as the deployed cron, so the result is identical.
+
+**When the Capitol site is down on their end, this is the script to run.**
+
+### Dry run (no DB writes, no emails)
+
+Verify the scrape works before running for real — fetches and parses the bill list,
+then test-fetches a sample of individual bill pages, printing each URL and whether
+it succeeded. **Writes nothing to the DB and sends no email.**
+
+```bash
+npm run scrape:dry-run
+# or, to sample more individual pages per chamber:
+node scrape.js --dry-run --individual-limit=20
+```
+
+Exits `0` if both chambers parsed bills and every sampled fetch succeeded, `1` otherwise.
+
+### Full run (writes to DB, sends notifications)
+
+Runs the real pipeline: data-URL scrape first, Playwright/www fallback on failure,
+then saves bills and sends follower notifications + deadline warnings.
+
+```bash
+npm run scrape:recover
+```
+
+Requires `DATABASE_URL`, `OPENAI_API_KEY`, and `RESEND_API_KEY` (plus the other
+notification vars) in your local `.env`. **This writes to the DB and sends real
+emails to followers**, so run the dry run first to confirm the scrape works.
+
+### Verify the app is healthy
+
+After changing scraper code (or before trusting a recovery run), run the backend
+test suite:
+
+```bash
+npm test
+```
 
 ## Directory Structure
 

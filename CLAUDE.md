@@ -21,6 +21,14 @@ notifications (status digests + deadline warnings).
 - **Scheduled work:** `server/cron-scrape.js` (`npm run cron:scrape`) — scrapes House + Senate,
   classifies, then sends notifications. Runs **once/day**; there is no local scheduler (running the
   dev server does NOT fire the cron).
+- **Recovery scraper:** `scrape.js` (repo root, `npm run scrape:recover`) — a **local** copy of the
+  daily pipeline for when `data.capitol.hawaii.gov` is down (recurring HTTP 500). Tries the data URL
+  first, then falls back to `www.capitol.hawaii.gov` via Playwright/Chromium (clears Cloudflare from
+  a residential IP; the deployed cron can't — datacenter IP gets 403). Same downstream pipeline as
+  the cron. `npm run scrape:dry-run` (or `node scrape.js --dry-run [--individual-limit=N]`) scrapes
+  and parses **without any DB writes or emails**, and test-fetches sample individual pages — use it
+  to confirm the scrape works before a real run. **This is the script to run when the Capitol site
+  is down on their end.**
 - **Deploy:** push-to-deploy via Dokku. `dev` branch → sandbox, `main` → production
   (`.github/workflows/`).
 
@@ -31,6 +39,8 @@ notifications (status digests + deadline warnings).
 - `npm run lint` — ESLint
 - `npm test` — `node --test "server/**/*.test.js"` (all backend tests)
 - `npm run cron:scrape` — run the full scrape→classify→notify pipeline
+- `npm run scrape:recover` — run that pipeline locally with a Playwright/www fallback (Capitol data host down)
+- `npm run scrape:dry-run` — scrape + parse only; no DB writes, no emails (verify the scrape works)
 - `npm run kysely-codegen` — regenerate DB types after a schema change
 
 ## Environment

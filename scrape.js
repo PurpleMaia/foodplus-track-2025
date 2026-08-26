@@ -9,10 +9,9 @@
  *
  * FLOW (per chamber):
  *   1. Try the REAL data-URL scrape first (default axios path, identical to the
- *      deployed cron). If it works, the genuine "data URL passed" email fires and
- *      we're done — no browser involved.
+ *      deployed cron). If it works, we're done — no browser involved.
  *   2. Only if that throws, fall back to the same pipeline with a Playwright
- *      fetcher pointed at www. No "data URL passed" email is sent on this path.
+ *      fetcher pointed at www.
  *
  * Only the list fetch differs on the fallback. Everything downstream — saveBills,
  * individual bill scrapes, status classification, follower notifications and
@@ -25,12 +24,12 @@
  */
 import axios from 'axios';
 import { chromium } from 'playwright';
-import { startScraping } from '../../server/services/scrapingService.js';
-import { scrapeBills, fetchListHtmlViaAxios } from '../../server/services/scraping/all-bills.js';
-import { getRandomUserAgent, MAIN_LIST_TIMEOUT, INDIVIDUAL_TIMEOUT } from '../../server/services/scraping/config.js';
-import { sendAlertEmail } from '../../server/services/notifications/cron-alerts.js';
-import { sendStatusChangeNotifications } from '../../server/services/notificationService.js';
-import { checkApproachingDeadlines, sendDeadlineWarnings } from '../../server/services/notifications/deadline-warnings.js';
+import { startScraping } from './server/services/scrapingService.js';
+import { scrapeBills, fetchListHtmlViaAxios } from './server/services/scraping/all-bills.js';
+import { getRandomUserAgent, MAIN_LIST_TIMEOUT, INDIVIDUAL_TIMEOUT } from './server/services/scraping/config.js';
+import { sendAlertEmail } from './server/services/notifications/cron-alerts.js';
+import { sendStatusChangeNotifications } from './server/services/notificationService.js';
+import { checkApproachingDeadlines, sendDeadlineWarnings } from './server/services/notifications/deadline-warnings.js';
 
 /**
  * Fetch the report HTML with a real browser. Drop-in for scrapeBills's default
