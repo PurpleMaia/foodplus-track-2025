@@ -2,7 +2,7 @@ import { db } from '../../../db/kysely/client.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { determineIfFoodRelated } from '../llmService.js';
-// import { sendAlertEmail } from '../notifications/cron-alerts.js'; // only needed by the parked Playwright fallback block below.
+import { sendAlertEmail } from '../notifications/cron-alerts.js';
 // import { fetchListHtmlViaBrowser } from './playwright-list.js'; // Playwright/www fallback — parked (see commented block below).
 import {
   getRandomUserAgent,
@@ -151,6 +151,29 @@ export async function scrapeBills(url, { fetchListHtml = fetchListHtmlViaAxios }
       // }
 
       console.error(`[ALL BILLS] Failed after ${attempt} attempt(s):`, error.message);
+
+      // The data host is down (this failure is the recurring HTTP 500 / network
+      // outage). Only alert on the genuine data-URL path — when a caller injects
+      // its own fetcher (the local scrape.js recovery run) it handles the
+      // fallback itself, so an alert there would be noise.
+      if (fetchListHtml === fetchListHtmlViaAxios) {
+        const status = error?.response?.status ? `HTTP ${error.response.status}` : (error?.code || error?.message);
+        await sendAlertEmail(
+          'ACTION NEEDED: data URL failed — run the Playwright backup',
+          [
+            `The daily scrape could not reach data.capitol.hawaii.gov after ${attempt} attempt(s).`,
+            `Error: ${status}`,
+            `URL: ${url}`,
+            '',
+            'The Capitol data host is down. Run the local recovery scraper from your',
+            'machine (residential IP) to scrape via the Playwright/www fallback:',
+            '',
+            '  npm run scrape:dry-run     # verify the scrape works (no DB writes, no emails)',
+            '  npm run scrape:recover     # real run: writes to DB + sends notifications',
+          ].join('\n')
+        );
+      }
+
       throw error;
     }
   }

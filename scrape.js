@@ -65,7 +65,11 @@ async function fetchListHtmlViaBrowser(url) {
 async function scrapeChamber(label, url) {
   try {
     console.log(`[MAIN] Scraping ${label} bills via data URL...`);
-    return await startScraping(url);
+    // Wrap the axios fetcher so it is NOT identical to the default — this
+    // suppresses scrapeBills's "run the Playwright backup" alert email. We ARE
+    // the backup: on failure we fall back to Playwright right here, so telling
+    // ourselves to go run it would be a redundant email.
+    return await startScraping(url, { fetchListHtml: (u) => fetchListHtmlViaAxios(u) });
   } catch (dataError) {
     console.warn(`[MAIN] ${label} data-URL scrape failed (${dataError.message}). Falling back to Playwright/www...`);
     return await startScraping(url, { fetchListHtml: fetchListHtmlViaBrowser });
