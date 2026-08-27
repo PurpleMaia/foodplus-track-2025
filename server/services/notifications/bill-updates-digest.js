@@ -189,7 +189,7 @@ function hearingTodayBanner(hearing) {
   return (
     `<div style="margin-top:12px;padding:10px 14px;border-radius:6px;` +
     `background-color:${COLOR.goldSoft};border:1px solid ${COLOR.gold};">` +
-    `<span style="font-size:14px;font-weight:700;color:${COLOR.gold};">☀ Hearing today</span>` +
+    `<span style="font-size:14px;font-weight:700;color:${COLOR.gold};">Hearing today</span>` +
     `<span style="font-size:14px;color:${COLOR.text};">${when} — testimony is due now.</span>` +
     `</div>`
   );
