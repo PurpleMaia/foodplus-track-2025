@@ -94,7 +94,6 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
 
       // extract base metadata from the page
       const description = $('#MainContent_ListView1_descriptionLabel_0').text().trim();
-      const currentStatus = $('#MainContent_ListView1_current_statusLabel_0').text().trim().replace(/\n\s*/g, ' ');
       const committeeAssignment = $('#MainContent_ListView1_current_referralLabel_0').text().trim();
       const billTitle = $('#MainContent_ListView1_measure_titleLabel_0').text().trim();
       const introducers = $('#MainContent_ListView1_introducerLabel_0').text().trim();
@@ -109,7 +108,6 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
           .values({
             bill_url: url,
             description: description,
-            current_status_string: currentStatus,
             committee_assignment: committeeAssignment,
             bill_title: billTitle,
             introducer: introducers,
@@ -141,6 +139,16 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
         }
       });
 
+      // The site removed the old #..._current_statusLabel_0 element, so derive the current
+      // status from the newest status_updates row instead. GridViewStatus renders newest-first,
+      // but DOM/DB order isn't guaranteed — pick the max by date (M/D/YYYY). This is the raw
+      // status text (e.g. "Referred to PSM/WLA.") the classifier + dead-check consume.
+      const newestUpdate = updates.reduce(
+        (newest, u) => (!newest || new Date(u.date) > new Date(newest.date) ? u : newest),
+        null,
+      );
+      const currentStatus = newestUpdate ? newestUpdate.statustext : '';
+
       // build bill data object to return, including updates array
       const billData = {
         bill_url: updatedUrl,
@@ -165,7 +173,7 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
       try {
         priorRow = await db
           .selectFrom('bills')
-          .select(['current_status_string', 'dead', 'bill_title'])
+          .select(['current_status_string', 'dead', 'bill_title', 'bill_status'])
           .where('id', '=', billID)
           .executeTakeFirst();
       } catch (err) {
@@ -173,6 +181,7 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
       }
       const priorStatus = priorRow?.current_status_string ?? null;
       const priorDead = priorRow?.dead ?? false;
+      const priorBillStatus = priorRow?.bill_status ?? null;
 
       // Guard against a transient empty scrape overwriting the stored baseline.
       const hasStatus = !!currentStatus && currentStatus.trim().length > 0;
@@ -191,7 +200,37 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
         .execute();
       console.log('[INDIVIDUAL] Bill data updated', billID);
 
-      // check if the bill is dead after saving updates (returns whether dead flipped)
+      // Derive the kanban bill_status (deterministic pattern-table classifier) BEFORE the dead
+      // check, since checkAndUpdateDeadStatus reads bills.bill_status. Runs after updates + bill
+      // row are persisted (the classifier reads status_updates and the bills row).
+      //
+      // Reclassify when: this is a brand-new bill, the raw status text changed since last run, OR
+      // the stored bill_status is still the default 'unassigned'. That last condition lets bills
+      // whose text has gone static (e.g. after sine die) still get classified out of the default —
+      // gating purely on text-changed left ~2900 bills frozen at 'unassigned'.
+      // Isolated try/catch: a classification failure must not fail the HTTP scrape.
+      const isBrandNew = isNewBill || insertedNewBill;
+      const isUnclassified = !priorBillStatus || priorBillStatus === 'unassigned';
+      if (hasStatus && (isBrandNew || priorStatus !== currentStatus || isUnclassified)) {
+        try {
+          console.log(`[STATUS] Classifying ${billNumber} (new=${isBrandNew}, textChanged=${priorStatus !== currentStatus}, wasUnassigned=${isUnclassified})...`);
+          const newBillStatus = await classifyBillStatus(billID);
+          if (newBillStatus) {
+            await db.updateTable('bills')
+              .set({ bill_status: newBillStatus })
+              .where('id', '=', billID)
+              .execute();
+            console.log(`[STATUS] ${billNumber} bill_status set to "${newBillStatus}"`);
+          } else {
+            console.warn(`[STATUS] ${billNumber}: no usable classification, bill_status left unchanged`);
+          }
+        } catch (err) {
+          console.error(`[STATUS] Failed to classify bill_status for ${billNumber}:`, err?.message || err);
+        }
+      }
+
+      // check if the bill is dead after saving updates + classifying (returns whether dead flipped).
+      // Runs AFTER classification so it reads the freshly-derived bill_status, not last run's value.
       const deadResult = await checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment, updates);
 
       // Record a notifiable change (status string differs, or dead flipped) for
@@ -209,29 +248,6 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
         if (change) {
           statusChanges.push(change);
           console.log(`[NOTIFY] Change captured for ${billNumber}: "${change.old_status}" → "${change.new_status}", dead ${change.old_dead}→${change.new_dead}`);
-        }
-      }
-
-      // Derive the kanban bill_status (deterministic pattern-table classifier) when the status
-      // changed or this is a brand-new bill. Runs after updates + bill row are persisted (the
-      // classifier reads status_updates and the bills row). Isolated try/catch: a classification
-      // failure must not fail the HTTP scrape.
-      const isBrandNew = isNewBill || insertedNewBill;
-      if (hasStatus && (isBrandNew || priorStatus !== currentStatus)) {
-        try {
-          console.log(`[STATUS] Status changed for ${billNumber} (new=${isBrandNew}); classifying...`);
-          const newBillStatus = await classifyBillStatus(billID);
-          if (newBillStatus) {
-            await db.updateTable('bills')
-              .set({ bill_status: newBillStatus })
-              .where('id', '=', billID)
-              .execute();
-            console.log(`[STATUS] ${billNumber} bill_status set to "${newBillStatus}"`);
-          } else {
-            console.warn(`[STATUS] ${billNumber}: no usable classification, bill_status left unchanged`);
-          }
-        } catch (err) {
-          console.error(`[STATUS] Failed to classify bill_status for ${billNumber}:`, err?.message || err);
         }
       }
 
