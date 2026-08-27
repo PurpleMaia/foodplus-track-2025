@@ -22,7 +22,7 @@ Reference + debugging aid for the deterministic bill-stage classifier that repla
 | `originChamber` | `HB*` → House, `SB*` → Senate (bill number prefix) |
 | `crossover` | newest status line's chamber ≠ `originChamber` |
 | `bothChambers` | distinct chambers across full history contains both `H` and `S` |
-| `committeeOrdinal` | position (1/2/3) of the committee named in the line, within the referral order of the current chamber phase. Joint committees (`ECD/TOU`) = one slot. |
+| `committeeOrdinal` | position (1/2/3) of the committee named in the line, within the referral order of the current chamber phase. Joint committees (`ECD/TOU`) = one slot. **Capped at 3** — a rare 4+-committee referral clamps to 3, since the enum only defines the `scheduled{N}`/`waiting{N}`/`deferred{N}` families up to 3. |
 
 `crossover` selects the `crossover*` stage variant. `bothChambers` gates the conference tier.
 
@@ -109,6 +109,9 @@ each prefixed `crossover` when `crossover === true` (e.g. `crossoverWaiting2`).
   in the referral order for the current chamber phase.
 - **Crossover reset:** after crossover the opposite chamber issues its own referral; that new
   referral list resets 1/2/3 for the post-crossover phase.
+- **Ordinal cap at 3:** `committeeOrdinal` clamps its result to a maximum of 3. The enum stops at
+  `scheduled3`/`waiting3`/`deferred3` (and their crossover forms), so a 4th-committee referral is
+  treated as the 3rd column rather than emitting an invalid `scheduled4` that fails the DB insert.
 
 ---
 

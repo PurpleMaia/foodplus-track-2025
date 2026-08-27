@@ -53,12 +53,16 @@ const NON_COMMITTEE = new Set([
  * Ordinal (1-based) of the committee named in `text`, per the referral order. 0 if none.
  * Only tokens present in `order` count, so junk acronyms are ignored by construction; the
  * NON_COMMITTEE set is a belt-and-suspenders guard for readability/robustness.
+ *
+ * Capped at 3: the kanban enum only defines the scheduled{N}/waiting{N}/deferred{N} families up
+ * to 3 (see server/kanban-columns.js). A rare 4+-committee referral would otherwise yield e.g.
+ * `scheduled4`, which fails the DB enum insert. A 4th committee is treated as the 3rd column.
  */
 function committeeOrdinal(text, order) {
   const cmts = (text.match(/[A-Z]{2,4}(?:\/[A-Z]{2,4})*/g) || []).filter(c => !NON_COMMITTEE.has(c));
   for (const c of cmts) {
     const i = order.indexOf(c);
-    if (i >= 0) return i + 1;
+    if (i >= 0) return Math.min(i + 1, 3);
   }
   return 0;
 }

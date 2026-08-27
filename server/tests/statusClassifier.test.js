@@ -218,6 +218,16 @@ test('committeeOrdinal ignores draft markers (HD/SD)', () => {
     ['1/23/2026', 'H', 'Introduced and Pass First Reading.'],
   ]), 'waiting3'); // FIN is 3rd -> waiting for FIN
 });
+test('committeeOrdinal caps at 3 (4-committee referral -> scheduled3, not invalid scheduled4)', () => {
+  // A rare 4-committee referral: the 4th committee (FIN) schedules a hearing. The kanban enum only
+  // defines scheduled{1,2,3}, so the 4th committee must clamp to scheduled3 rather than emit the
+  // invalid `scheduled4` that fails the DB enum insert.
+  assert.equal(clf('HB1', [
+    ['2/11/2026', 'H', 'The committee(s) on FIN has scheduled a public hearing on 02-15-26.'],
+    ['2/2/2026', 'H', 'Referred to EDN, LAB, JHA, FIN, referral sheet 1'],
+    ['1/23/2026', 'H', 'Introduced and Pass First Reading.'],
+  ]), 'scheduled3');
+});
 test('DOMAIN RULE: "recommendation was not adopted" negates the preceding PASS (stays scheduled)', () => {
   // AEN recommended PASS, but the recommendation was not adopted -> bill stays at the 1st hearing.
   assert.equal(clf('SB1', [
