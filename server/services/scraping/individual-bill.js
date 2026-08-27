@@ -211,10 +211,13 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
       // Isolated try/catch: a classification failure must not fail the HTTP scrape.
       const isBrandNew = isNewBill || insertedNewBill;
       const isUnclassified = !priorBillStatus || priorBillStatus === 'unassigned';
+      // Hoisted so the change record below can compare the freshly-derived kanban stage
+      // against priorBillStatus. Null when we didn't reclassify this run (stage unchanged).
+      let newBillStatus = null;
       if (hasStatus && (isBrandNew || priorStatus !== currentStatus || isUnclassified)) {
         try {
           console.log(`[STATUS] Classifying ${billNumber} (new=${isBrandNew}, textChanged=${priorStatus !== currentStatus}, wasUnassigned=${isUnclassified})...`);
-          const newBillStatus = await classifyBillStatus(billID);
+          newBillStatus = await classifyBillStatus(billID);
           if (newBillStatus) {
             await db.updateTable('bills')
               .set({ bill_status: newBillStatus })
@@ -233,19 +236,25 @@ export async function scrapeIndividual(billClassifier, statusChanges = null, isN
       // Runs AFTER classification so it reads the freshly-derived bill_status, not last run's value.
       const deadResult = await checkAndUpdateDeadStatus(billID, billNumber, committeeAssignment, updates);
 
-      // Record a notifiable change (status string differs, or dead flipped) for
-      // end-of-run follower notifications. Skipped for brand-new bills (no prior baseline).
+      // Record a notifiable change for end-of-run follower notifications. Detection keys on
+      // the KANBAN bill_status (the deterministic stage), NOT the raw current_status_string —
+      // so we only notify on a real stage move (introduced→scheduled1), not on every wording
+      // tweak in the Capitol text. The raw text rides along as `raw_status` for display detail.
+      // `effectiveBillStatus` = the stage after this run: the fresh classification if we
+      // reclassified, else the unchanged prior stage. Skipped for brand-new bills (no baseline).
       if (statusChanges && priorRow && !isNewBill && hasStatus) {
+        const effectiveBillStatus = newBillStatus ?? priorBillStatus;
         const change = computeChange({
           billId: billID,
           billNumber,
           billTitle: billTitle,
-          oldStatus: priorStatus,
-          newStatus: currentStatus,
+          oldStatus: priorBillStatus,
+          newStatus: effectiveBillStatus,
           oldDead: priorDead,
           newDead: deadResult.dead,
         });
         if (change) {
+          change.raw_status = currentStatus; // the live Capitol line, shown as subtext
           statusChanges.push(change);
           console.log(`[NOTIFY] Change captured for ${billNumber}: "${change.old_status}" → "${change.new_status}", dead ${change.old_dead}→${change.new_dead}`);
         }

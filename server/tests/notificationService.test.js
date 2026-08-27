@@ -4,7 +4,7 @@ import { groupChangesByUser, sendStatusChangeNotifications } from '../services/n
 
 const change = (over) => ({
   bill_id: 'b1', bill_number: 'HB1', bill_title: 'One',
-  old_status: 'Passed 2nd', new_status: 'Referred to JDC',
+  old_status: 'scheduled2', new_status: 'passedCommittees',
   old_dead: false, new_dead: false, ...over,
 });
 
@@ -48,9 +48,10 @@ test('groupChangesByUser returns empty map for no rows', () => {
 // sendStatusChangeNotifications — orchestrator tests (injected fakes, no DB)
 // ---------------------------------------------------------------------------
 
+// old/new status are kanban bill_status enum ids (not raw Capitol text).
 const mkChange = (over) => ({
   bill_id: 'b1', bill_number: 'HB1', bill_title: 'One',
-  old_status: 'First Reading', new_status: 'Passed 2nd',
+  old_status: 'introduced', new_status: 'scheduled1',
   old_dead: false, new_dead: false, ...over,
 });
 

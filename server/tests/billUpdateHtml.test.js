@@ -90,6 +90,25 @@ test('escapes HTML in bill title', () => {
   assert.doesNotMatch(html, /<script>/);
 });
 
+test('renders the kanban stage labels, with the raw Capitol line as subtext', () => {
+  const html = buildBillUpdateHtml([
+    change({
+      old_status: 'introduced', new_status: 'scheduled1',
+      raw_status: '(H) Bill scheduled to be heard by FIN on 02-25-26 2:00PM in conference room 308.',
+    }),
+  ]);
+  // clean kanban labels from statusLabel(COLUMN_TITLES) — '&' is HTML-escaped
+  assert.match(html, /INTRODUCED &amp; WAITING 1ST/);
+  assert.match(html, /SCHEDULED 1ST/);
+  // raw Capitol text present as detail subtext
+  assert.match(html, /scheduled to be heard by FIN on 02-25-26 2:00PM/);
+});
+
+test('omits the raw subtext when raw_status is absent', () => {
+  const html = buildBillUpdateHtml([change({ raw_status: undefined })]);
+  assert.doesNotMatch(html, /conference room/);
+});
+
 test('logo image has no background color (transparent PNG stands alone)', () => {
   const html = buildBillUpdateHtml([change()]);
   const imgTag = /<img[^>]*foodplus-logo[^>]*>/.exec(html)?.[0] ?? '';

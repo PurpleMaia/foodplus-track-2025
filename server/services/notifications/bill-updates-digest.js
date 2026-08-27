@@ -211,6 +211,17 @@ function meaningLine(change) {
 }
 
 /**
+ * The raw Capitol status line as small subtext under the clean stage pills — the human
+ * detail (committee, room, time) behind the kanban stage. '' when absent.
+ * @param {string|null|undefined} rawStatus
+ * @returns {string}
+ */
+function rawStatusLine(rawStatus) {
+  if (!rawStatus) return '';
+  return `<div style="margin-top:6px;font-size:13px;color:${COLOR.muted};line-height:1.4;">${escapeHtml(rawStatus)}</div>`;
+}
+
+/**
  * One branded per-bill card.
  * @param {{ bill_number: string, bill_title: string|null }} change
  * @returns {string}
@@ -228,6 +239,7 @@ function billCard(change, accent = COLOR.teal) {
     `<div style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(change.bill_number)}</div>` +
     title +
     statusRow(change) +
+    rawStatusLine(change.raw_status) +
     hearingTodayBanner(change.hearing_today) +
     meaningLine(change) +
     action +
