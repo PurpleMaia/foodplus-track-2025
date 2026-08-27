@@ -1,7 +1,9 @@
+import { sql } from 'kysely';
 import { db } from '../../../db/kysely/client.js';
 import { getNextDeadline } from '../dead-bill.js';
 import sessionDeadlines from '../../../session-deadlines-2026.json' with { type: 'json' };
 import { sendDeadlineWarningEmail } from './bill-updates-digest.js';
+import { testimonyClosing } from './hearing-schedule.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HEADS_UP_DAYS = 7; // first "heads up" tier
@@ -115,6 +117,59 @@ export async function checkApproachingDeadlines(today, { fetchBills = defaultFet
 }
 
 /**
+ * Default loader for testimony-deadline detection: living bills joined to their
+ * status_updates, so the hearing date can be parsed out of the scheduling text.
+ * @returns {Promise<Array<BillRow & { statusUpdates: Array<{ date: string, statustext: string }> }>>}
+ */
+async function defaultFetchBillsWithStatus() {
+  const bills = await defaultFetchBills();
+  if (bills.length === 0) return [];
+  const rows = await db
+    .selectFrom('status_updates as su')
+    .select(['su.bill_id as bill_id', 'su.date as date', 'su.statustext as statustext'])
+    .where('su.bill_id', 'in', bills.map((b) => b.id))
+    .orderBy(sql`cast(su.date as date)`, 'desc')
+    .execute();
+  const byBill = new Map();
+  for (const r of rows) {
+    if (!byBill.has(r.bill_id)) byBill.set(r.bill_id, []);
+    byBill.get(r.bill_id).push({ date: r.date, statustext: r.statustext });
+  }
+  return bills.map((b) => ({ ...b, statusUpdates: byBill.get(b.id) ?? [] }));
+}
+
+/**
+ * Find bills whose TESTIMONY window is closing — the hearing (parsed from status text)
+ * is today or tomorrow, so testimony is effectively due now. Returned in the same warning
+ * shape as checkApproachingDeadlines, always at the urgent ('3') tier, so both feed the
+ * same deadline-warning email.
+ *
+ * @param {string} today - YYYY-MM-DD
+ * @param {{ fetchBills?: () => Promise<Array<BillRow & { statusUpdates: Array<{ date: string, statustext: string }> }>> }} [deps]
+ * @returns {Promise<Array<{ bill: BillRow, nextName: string, nextDate: string, daysLeft: number, tier: '3', testimony: true }>>}
+ */
+export async function checkTestimonyDeadlines(today, { fetchBills = defaultFetchBillsWithStatus } = {}) {
+  const bills = await fetchBills();
+  const toWarn = [];
+
+  for (const bill of bills) {
+    const closing = testimonyClosing(bill.statusUpdates, today);
+    if (!closing) continue;
+
+    toWarn.push({
+      bill,
+      nextName: closing.time ? `Testimony deadline (hearing ${closing.time})` : 'Testimony deadline',
+      nextDate: closing.date,
+      daysLeft: closing.daysUntil,
+      tier: '3', // testimony closing is always urgent
+      testimony: true,
+    });
+  }
+
+  return toWarn;
+}
+
+/**
  * Default follower lookup — mirrors notificationService.defaultFetchFollowers.
  * @param {string[]} billIds
  * @returns {Promise<Array<{ bill_id: string, user_id: string, email: string }>>}
@@ -167,11 +222,15 @@ export async function sendDeadlineWarnings(warnings, { fetchFollowers = defaultF
     return { usersNotified: 0, billsWarned: warnings.length };
   }
 
-  // Build the per-bill email item once, then fan out to that bill's followers.
+  // Build the per-bill email item once, then fan out to that bill's followers. A bill
+  // can appear in BOTH lists (a legislative deadline AND a testimony window closing);
+  // the testimony warning is the more time-sensitive, so let it win the per-bill slot.
+  const ordered = [...warnings].sort((a, b) => Number(Boolean(a.testimony)) - Number(Boolean(b.testimony)));
   const itemByBill = new Map(
-    warnings.map((w) => [
+    ordered.map((w) => [
       w.bill.id,
       {
+        bill_id: w.bill.id,
         bill_number: w.bill.bill_number,
         bill_title: w.bill.bill_title,
         current_status: w.bill.bill_status,

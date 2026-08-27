@@ -46,12 +46,38 @@ test('CTA links to APP_URL', () => {
   const html = buildDeadlineWarningHtml([item()]);
   const appUrl = process.env.APP_URL || 'https://foodplus.purplemaia.org';
   assert.ok(html.includes(`href="${appUrl}"`));
-  assert.match(html, /View in\s+Bill Tracker/);
+  assert.match(html, /View in Hawaiʻi Bill Tracker/);
+});
+
+test('header renders the logo image and wordmark', () => {
+  const html = buildDeadlineWarningHtml([item()]);
+  const appUrl = process.env.APP_URL || 'https://foodplus.purplemaia.org';
+  assert.ok(html.includes(`${appUrl}/email/foodplus-logo.png`), 'logo src derives from APP_URL');
+  assert.match(html, /Hawaiʻi Bill Tracker/);
+});
+
+test('footer credits the partner organizations', () => {
+  const html = buildDeadlineWarningHtml([item()]);
+  assert.match(html, /Purple Maiʻa Foundation/);
+  assert.match(html, /ʻĀina Foundry/);
+  assert.match(html, /Hawaiʻi Food\+ Policy/);
 });
 
 test('current status pill rendered when present', () => {
   const html = buildDeadlineWarningHtml([item()]);
   assert.match(html, /WAITING 2ND/); // statusLabel('waiting2')
+});
+
+test('deadline card explains the stage and links to an action when bill_id is present', () => {
+  const html = buildDeadlineWarningHtml([item({ bill_id: 'd1', current_status: 'scheduled1' })]);
+  assert.match(html, /scheduled for a committee hearing/i);
+  assert.match(html, /Submit testimony/);
+  assert.match(html, /\/bills\/d1\/testimony/);
+});
+
+test('deadline card omits the action link when bill_id is missing', () => {
+  const html = buildDeadlineWarningHtml([item({ current_status: 'scheduled1' })]); // no bill_id
+  assert.doesNotMatch(html, /\/bills\/[^/]+\/testimony/, 'no link without an id');
 });
 
 test('plain-text body mirrors the warning', () => {

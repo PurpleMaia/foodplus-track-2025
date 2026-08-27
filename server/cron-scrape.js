@@ -2,7 +2,7 @@
 import { startScraping } from './services/scrapingService.js';
 import { sendAlertEmail } from './services/notifications/cron-alerts.js';
 import { sendStatusChangeNotifications } from './services/notificationService.js';
-import { checkApproachingDeadlines, sendDeadlineWarnings } from './services/notifications/deadline-warnings.js';
+import { checkApproachingDeadlines, checkTestimonyDeadlines, sendDeadlineWarnings } from './services/notifications/deadline-warnings.js';
 
 async function cronScrape() {
     const currentYear = new Date().getFullYear();
@@ -90,9 +90,15 @@ async function cronScrape() {
     // Wrapped so a failure never fails the scrape.
     try {
       const today = new Date().toISOString().split('T')[0];
-      const warnings = await checkApproachingDeadlines(today);
+      // Two sources feed the same warning email: approaching legislative deadlines
+      // (7-day / 3-day tiers) and testimony windows closing (hearing within ~24h).
+      const [deadlineWarnings, testimonyWarnings] = await Promise.all([
+        checkApproachingDeadlines(today),
+        checkTestimonyDeadlines(today),
+      ]);
+      const warnings = [...deadlineWarnings, ...testimonyWarnings];
       const { usersNotified } = await sendDeadlineWarnings(warnings);
-      console.log(`[MAIN] Deadline warnings: ${usersNotified} user(s), ${warnings.length} bill(s)`);
+      console.log(`[MAIN] Deadline warnings: ${usersNotified} user(s), ${warnings.length} bill(s) (${testimonyWarnings.length} testimony-closing)`);
     } catch (deadlineErr) {
       console.error('[MAIN] Deadline warning dispatch failed:', deadlineErr);
       await sendAlertEmail('Deadline warning dispatch failed', [

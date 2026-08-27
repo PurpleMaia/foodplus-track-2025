@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildBillUpdateHtml } from '../services/notifications/bill-updates-digest.js';
+import { buildBillUpdateHtml, stageGuidance } from '../services/notifications/bill-updates-digest.js';
 
 const change = (over) => ({
   bill_id: 'b1', bill_number: 'HB123', bill_title: 'Local Food Act',
@@ -28,12 +28,21 @@ test('status change renders human-readable old and new labels', () => {
   assert.match(html, /CONFERENCE/);
 });
 
-test('DEAD change renders coral pill', () => {
+test('newly-dead change renders a FAILED pill (not DEAD) and a failed explanation', () => {
   const html = buildBillUpdateHtml([
     change({ old_status: 'waiting2', new_status: 'waiting2', new_dead: true }),
   ]);
   assert.match(html, /#C97474/, 'coral present');
-  assert.match(html, /DEAD/);
+  assert.match(html, /FAILED/);
+  assert.doesNotMatch(html, /DEAD/, 'the word DEAD is retired in favor of FAILED');
+  assert.match(html, /failed to meet a legislative deadline/i, 'explains the failure');
+});
+
+test('a newly-failed bill offers no action link', () => {
+  const html = buildBillUpdateHtml([
+    change({ old_status: 'waiting2', new_status: 'waiting2', new_dead: true }),
+  ]);
+  assert.doesNotMatch(html, /\/testimony|\/contact/, 'no CTA route on a dead bill');
 });
 
 test('revived change renders olive pill', () => {
@@ -48,7 +57,21 @@ test('CTA button links to APP_URL', () => {
   const html = buildBillUpdateHtml([change()]);
   const appUrl = process.env.APP_URL || 'https://foodplus.purplemaia.org';
   assert.ok(html.includes(`href="${appUrl}"`), 'CTA href points at APP_URL');
-  assert.match(html, /View in\s+Bill Tracker/);
+  assert.match(html, /View in Hawaiʻi Bill Tracker/);
+});
+
+test('header renders the logo image and wordmark', () => {
+  const html = buildBillUpdateHtml([change()]);
+  const appUrl = process.env.APP_URL || 'https://foodplus.purplemaia.org';
+  assert.ok(html.includes(`${appUrl}/email/foodplus-logo.png`), 'logo src derives from APP_URL');
+  assert.match(html, /Hawaiʻi Bill Tracker/);
+});
+
+test('footer credits the partner organizations', () => {
+  const html = buildBillUpdateHtml([change()]);
+  assert.match(html, /Purple Maiʻa Foundation/);
+  assert.match(html, /ʻĀina Foundry/);
+  assert.match(html, /Hawaiʻi Food\+ Policy/);
 });
 
 test('renders one card per change', () => {
@@ -65,4 +88,54 @@ test('escapes HTML in bill title', () => {
   const html = buildBillUpdateHtml([change({ bill_title: 'A & B <script>' })]);
   assert.match(html, /A &amp; B &lt;script&gt;/);
   assert.doesNotMatch(html, /<script>/);
+});
+
+test('logo image has no background color (transparent PNG stands alone)', () => {
+  const html = buildBillUpdateHtml([change()]);
+  const imgTag = /<img[^>]*foodplus-logo[^>]*>/.exec(html)?.[0] ?? '';
+  assert.ok(imgTag, 'logo img present');
+  assert.doesNotMatch(imgTag, /background-color/, 'no white box behind the logo');
+});
+
+test('a scheduled bill explains the change and links to submit testimony', () => {
+  const html = buildBillUpdateHtml([
+    change({ old_status: 'introduced', new_status: 'scheduled1', bill_id: 'abc' }),
+  ]);
+  assert.match(html, /scheduled for a committee hearing/i, 'meaning explained');
+  assert.match(html, /Submit testimony/);
+  assert.match(html, /\/bills\/abc\/testimony/, 'links to the per-bill testimony route');
+});
+
+test('an introduced bill links to contact your legislator', () => {
+  const html = buildBillUpdateHtml([
+    change({ old_status: 'unassigned', new_status: 'introduced', bill_id: 'xyz' }),
+  ]);
+  assert.match(html, /introduced and is awaiting its first committee referral/i);
+  assert.match(html, /Contact your legislator/);
+  assert.match(html, /\/bills\/xyz\/contact/, 'links to the per-bill contact route');
+});
+
+test('a hearing-today bill renders the highlighted banner with the time', () => {
+  const html = buildBillUpdateHtml([
+    change({ new_status: 'scheduled1', hearing_today: { date: '2026-03-06', time: '1:02PM' } }),
+  ]);
+  assert.match(html, /Hearing today/i);
+  assert.match(html, /1:02PM/);
+});
+
+test('a bill with no hearing today renders no banner', () => {
+  const html = buildBillUpdateHtml([change({ new_status: 'scheduled1', hearing_today: null })]);
+  assert.doesNotMatch(html, /Hearing today/i);
+});
+
+test('stageGuidance classifies by family with a safe default', () => {
+  assert.equal(stageGuidance('scheduled3').action.kind, 'testimony');
+  assert.equal(stageGuidance('crossoverScheduled1').action.kind, 'testimony');
+  assert.equal(stageGuidance('waiting2').action.kind, 'contact');
+  assert.equal(stageGuidance('introduced').action.kind, 'contact');
+  assert.equal(stageGuidance('governorSigns').action.kind, null);
+  // Unknown id: no invented meaning, but still a safe default action.
+  const unknown = stageGuidance('someBrandNewStage');
+  assert.equal(unknown.meaning, '');
+  assert.equal(unknown.action.kind, 'contact');
 });

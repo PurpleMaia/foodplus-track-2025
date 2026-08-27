@@ -1,6 +1,8 @@
+import { sql } from 'kysely';
 import { db } from '../../db/kysely/client.js';
 import { describeChange } from './statusChange.js';
 import { sendBillUpdateEmail } from './notifications/bill-updates-digest.js';
+import { hearingToday } from './notifications/hearing-schedule.js';
 
 /**
  * Group follower rows into one entry per user, building digest lines.
@@ -44,12 +46,43 @@ async function defaultFetchFollowers(billIds) {
 }
 
 /**
+ * Default hearing lookup: for the given bills, read their status_updates and return a
+ * Map of bill_id → parsed hearing ({date,time}) for bills whose hearing is `today`.
+ * Bills without a hearing today are simply absent from the map.
+ * @param {string[]} billIds
+ * @param {string} today - YYYY-MM-DD
+ * @returns {Promise<Map<string, { date: string, time: string|null }>>}
+ */
+async function defaultFetchHearingsToday(billIds, today) {
+  if (billIds.length === 0) return new Map();
+  const rows = await db
+    .selectFrom('status_updates as su')
+    .select(['su.bill_id as bill_id', 'su.statustext as statustext', 'su.date as date'])
+    .where('su.bill_id', 'in', billIds)
+    .orderBy(sql`cast(su.date as date)`, 'desc')
+    .execute();
+
+  // Group status lines per bill, then ask the pure parser if any is a hearing today.
+  const byBill = new Map();
+  for (const r of rows) {
+    if (!byBill.has(r.bill_id)) byBill.set(r.bill_id, []);
+    byBill.get(r.bill_id).push({ date: r.date, statustext: r.statustext });
+  }
+  const result = new Map();
+  for (const [billId, updates] of byBill) {
+    const hearing = hearingToday(updates, today);
+    if (hearing) result.set(billId, hearing);
+  }
+  return result;
+}
+
+/**
  * Given the changes collected during a scrape run, email each follower a digest.
  * @param {Array<{ bill_id: string, bill_number: string, bill_title: string|null, old_status: string|null, new_status: string|null, old_dead: boolean|null, new_dead: boolean|null }>} changes
- * @param {{ fetchFollowers?: (billIds: string[]) => Promise<Array<{ bill_id: string, user_id: string, email: string }>>, sendEmail?: (toEmail: string, lines: string[], changes: object[]) => Promise<void> }} [deps]
+ * @param {{ fetchFollowers?: (billIds: string[]) => Promise<Array<{ bill_id: string, user_id: string, email: string }>>, fetchHearingsToday?: (billIds: string[], today: string) => Promise<Map<string, { date: string, time: string|null }>>, today?: string, sendEmail?: (toEmail: string, lines: string[], changes: object[]) => Promise<void> }} [deps]
  * @returns {Promise<{ usersNotified: number, changesSent: number }>}
  */
-export async function sendStatusChangeNotifications(changes, { fetchFollowers = defaultFetchFollowers, sendEmail = sendBillUpdateEmail } = {}) {
+export async function sendStatusChangeNotifications(changes, { fetchFollowers = defaultFetchFollowers, fetchHearingsToday = defaultFetchHearingsToday, today = new Date().toISOString().split('T')[0], sendEmail = sendBillUpdateEmail } = {}) {
   if (!changes || changes.length === 0) {
     console.log('[NOTIFY] No bill changes to notify');
     return { usersNotified: 0, changesSent: 0 };
@@ -64,8 +97,12 @@ export async function sendStatusChangeNotifications(changes, { fetchFollowers = 
     return { usersNotified: 0, changesSent: changes.length };
   }
 
+  // Annotate each change with its hearing-today (if any) so the digest can banner it.
+  const hearings = await fetchHearingsToday(billIds, today);
+  const annotatedChanges = changes.map(c => ({ ...c, hearing_today: hearings.get(c.bill_id) ?? null }));
+
   // Join followers to their changes (a bill may have several followers).
-  const changeByBill = new Map(changes.map(c => [c.bill_id, c]));
+  const changeByBill = new Map(annotatedChanges.map(c => [c.bill_id, c]));
   const followerRows = followers
     .filter(f => changeByBill.has(f.bill_id) && f.email)
     .map(f => ({ user_id: f.user_id, email: f.email, change: changeByBill.get(f.bill_id) }));

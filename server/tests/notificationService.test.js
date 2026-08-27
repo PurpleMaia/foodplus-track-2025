@@ -8,6 +8,9 @@ const change = (over) => ({
   old_dead: false, new_dead: false, ...over,
 });
 
+// Stub so the hearing-today enrichment never touches the DB in these unit tests.
+const noHearings = async () => new Map();
+
 test('groupChangesByUser groups multiple bills under one user', () => {
   const rows = [
     { user_id: 'u1', email: 'a@x.com', change: change({ bill_number: 'HB1' }) },
@@ -61,7 +64,7 @@ test('sendStatusChangeNotifications: two followers of one bill each get an email
 
   const result = await sendStatusChangeNotifications(
     [mkChange({})],
-    { fetchFollowers: fakeFollowers, sendEmail: fakeSend },
+    { fetchFollowers: fakeFollowers, fetchHearingsToday: noHearings, sendEmail: fakeSend },
   );
 
   assert.equal(calls.length, 2, 'sendEmail called once per user');
@@ -83,7 +86,7 @@ test('sendStatusChangeNotifications: one user following two changed bills gets o
 
   const result = await sendStatusChangeNotifications(
     [mkChange({ bill_id: 'b1', bill_number: 'HB1' }), mkChange({ bill_id: 'b2', bill_number: 'HB2' })],
-    { fetchFollowers: fakeFollowers, sendEmail: fakeSend },
+    { fetchFollowers: fakeFollowers, fetchHearingsToday: noHearings, sendEmail: fakeSend },
   );
 
   assert.equal(calls.length, 1, 'only one email for one user');
@@ -104,12 +107,26 @@ test('sendStatusChangeNotifications: follower with null email is filtered out', 
 
   const result = await sendStatusChangeNotifications(
     [mkChange({})],
-    { fetchFollowers: fakeFollowers, sendEmail: fakeSend },
+    { fetchFollowers: fakeFollowers, fetchHearingsToday: noHearings, sendEmail: fakeSend },
   );
 
   assert.equal(calls.length, 1, 'null-email user not sent to');
   assert.equal(calls[0].email, 'u2@test.com');
   assert.equal(result.usersNotified, 1);
+});
+
+test('sendStatusChangeNotifications: a hearing-today bill is annotated onto its change', async () => {
+  const calls = [];
+  const fakeSend = async (email, lines, changes) => calls.push({ email, changes });
+  const fakeFollowers = async () => [{ bill_id: 'b1', user_id: 'u1', email: 'u1@test.com' }];
+  const fakeHearings = async () => new Map([['b1', { date: '2026-03-06', time: '1:02PM' }]]);
+
+  await sendStatusChangeNotifications(
+    [mkChange({})],
+    { fetchFollowers: fakeFollowers, fetchHearingsToday: fakeHearings, today: '2026-03-06', sendEmail: fakeSend },
+  );
+
+  assert.deepEqual(calls[0].changes[0].hearing_today, { date: '2026-03-06', time: '1:02PM' });
 });
 
 test('sendStatusChangeNotifications: empty changes → returns zeroes, no DB/email calls', async () => {

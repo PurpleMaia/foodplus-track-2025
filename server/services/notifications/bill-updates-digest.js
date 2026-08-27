@@ -3,8 +3,11 @@ import { statusLabel, diffBillState } from '../statusChange.js';
 dotenv.config();
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const ALERT_FROM = process.env.ALERT_FROM || ' Alerts <onboarding@resend.dev>';
+const ALERT_FROM = process.env.ALERT_FROM || 'Hawaiʻi Bill Tracker <onboarding@resend.dev>';
 const APP_URL = process.env.APP_URL || 'https://foodplus.purplemaia.org';
+// Logo lives in public/email/ → copied verbatim into dist/ by Vite and served
+// statically by Express, so it resolves under whatever APP_URL is deployed to.
+const LOGO_URL = `${APP_URL.replace(/\/$/, '')}/email/foodplus-logo.png`;
 
 //  brand palette (from app globals.css, HSL → hex).
 const COLOR = {
@@ -17,6 +20,8 @@ const COLOR = {
   border: '#E5E0D8',
   coral: '#C97474',
   olive: '#A8B660',
+  gold: '#B8860B',      // "hearing today" highlight (warm, distinct from teal/coral)
+  goldSoft: '#FBF3DC',  // its soft background
 };
 
 /**
@@ -30,7 +35,8 @@ export function buildBillUpdateBody(lines) {
     '',
     ...lines.map(l => `- ${l}`),
     '',
-    'You are receiving this because you follow these bills in the  bill tracker.',
+    'You are receiving this because you follow these bills in the Hawaiʻi Bill Tracker.',
+    'Made by Purple Maiʻa Foundation ʻĀina Foundry, and Hawaiʻi Food+ Policy.',
   ].join('\n');
 }
 
@@ -45,6 +51,57 @@ function escapeHtml(value) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/**
+ * Plain-language meaning of a bill's current stage plus the single most useful
+ * action a follower can take from it. Classified by stage FAMILY (not all ~28
+ * ids individually) so new/unseen ids still get sensible copy via the default.
+ *
+ * `action.kind` maps to a per-bill route the app serves:
+ *   'testimony' → ${APP_URL}/bills/<id>/testimony   (a hearing is coming up)
+ *   'contact'   → ${APP_URL}/bills/<id>/contact      (no hearing yet; lobby a legislator)
+ *   null        → no CTA (terminal/administrative stages where action is moot)
+ *
+ * @param {string|null} statusId - a bills.bill_status enum id
+ * @returns {{ meaning: string, action: { kind: 'testimony'|'contact'|null, label: string|null } }}
+ */
+export function stageGuidance(statusId) {
+  const id = statusId || '';
+  const testimony = { kind: 'testimony', label: 'Submit testimony' };
+  const contact = { kind: 'contact', label: 'Contact the committee members' };
+  const contactIntro = { kind: 'contact', label: 'Contact your legislator' };
+  const none = { kind: null, label: null };
+
+  // Terminal / governor stages — the outcome is decided; no follower action.
+  if (id === 'governorSigns') return { meaning: 'The Governor has signed this bill into law.', action: none };
+  if (id === 'lawWithoutSignature') return { meaning: 'This bill became law without the Governor’s signature.', action: none };
+  if (id === 'vetoList') return { meaning: 'The Governor has vetoed this bill.', action: none };
+  if (id === 'transmittedGovernor') return { meaning: 'This bill has passed the Legislature and is now on the Governor’s desk.', action: contactIntro };
+
+  // Scheduled for a hearing (any reading, pre- or post-crossover) → testimony window is open.
+  if (/^(crossover)?[Ss]cheduled\d$/.test(id) || id === 'conferenceScheduled') {
+    return { meaning: 'This bill has been scheduled for a committee hearing.', action: testimony };
+  }
+  // Waiting to be scheduled (referred, not yet heard) → lobby the committee to hear it.
+  if (/^(crossover)?[Ww]aiting\d$/.test(id)) {
+    return { meaning: 'This bill is awaiting a hearing in committee.', action: contact };
+  }
+  // Deferred after a hearing → committee held it; contact them to revive it.
+  if (/[Dd]eferred\d$/.test(id) || id === 'conferenceDeferred') {
+    return { meaning: 'This bill was deferred after its committee hearing and may not advance.', action: contact };
+  }
+  // Just introduced / awaiting first referral → the earliest point to weigh in.
+  if (id === 'introduced' || id === 'unassigned') {
+    return { meaning: 'This bill has been introduced and is awaiting its first committee referral.', action: contactIntro };
+  }
+  // Conference / passed-committees stages → both chambers reconciling the text.
+  if (id === 'passedCommittees' || id === 'conferenceAssigned' || id === 'conferencePassed') {
+    return { meaning: 'This bill has cleared its committees and is in conference between the House and Senate.', action: contactIntro };
+  }
+
+  // Unknown/new id: no invented meaning, but still offer the safe default action.
+  return { meaning: '', action: contactIntro };
 }
 
 /**
@@ -92,7 +149,7 @@ function statusRow(change) {
   if (deadChanged) {
     pills.push(
       Boolean(change.new_dead)
-        ? statusPill('DEAD', 'dead')
+        ? statusPill('FAILED', 'dead')
         : statusPill('Revived · ALIVE', 'alive'),
     );
   }
@@ -100,20 +157,80 @@ function statusRow(change) {
 }
 
 /**
+ * A per-bill action link ("Submit testimony", "Contact your legislator") pointing
+ * at the app's per-bill route. Returns '' when the stage has no useful action or
+ * the bill id is missing (can't build a link without it).
+ * @param {{ kind: 'testimony'|'contact'|null, label: string|null }} action
+ * @param {string|null|undefined} billId
+ * @param {string} accent - the email's accent color (teal or coral)
+ * @returns {string}
+ */
+function actionLink(action, billId, accent) {
+  if (!action?.kind || !billId) return '';
+  const url = `${APP_URL.replace(/\/$/, '')}/bills/${encodeURIComponent(billId)}/${action.kind}`;
+  return (
+    `<div style="margin-top:12px;">` +
+    `<a href="${escapeHtml(url)}" target="_blank" ` +
+    `style="display:inline-block;padding:8px 16px;border-radius:6px;background-color:${accent};` +
+    `color:${COLOR.white};font-size:13px;font-weight:600;text-decoration:none;">` +
+    `${escapeHtml(action.label)} &rarr;</a></div>`
+  );
+}
+
+/**
+ * A prominent "Hearing today" banner. `hearing` is the parsed hearing ({date, time});
+ * pass null/undefined when the bill has no hearing today and this renders ''.
+ * @param {{ date: string, time: string|null } | null | undefined} hearing
+ * @returns {string}
+ */
+function hearingTodayBanner(hearing) {
+  if (!hearing) return '';
+  const when = hearing.time ? ` at ${escapeHtml(hearing.time)}` : '';
+  return (
+    `<div style="margin-top:12px;padding:10px 14px;border-radius:6px;` +
+    `background-color:${COLOR.goldSoft};border:1px solid ${COLOR.gold};">` +
+    `<span style="font-size:14px;font-weight:700;color:${COLOR.gold};">☀ Hearing today</span>` +
+    `<span style="font-size:14px;color:${COLOR.text};">${when} — testimony is due now.</span>` +
+    `</div>`
+  );
+}
+
+/**
+ * A plain-language line explaining what the bill's new stage means. '' when there's
+ * no meaning to show (unknown stage). Dead bills get a fixed "failed" explanation.
+ * @param {{ new_status: string|null, new_dead: boolean|null, old_dead: boolean|null }} change
+ * @returns {string}
+ */
+function meaningLine(change) {
+  const nowDead = Boolean(change.new_dead) && !Boolean(change.old_dead);
+  const meaning = nowDead
+    ? 'This bill failed to meet a legislative deadline and is no longer advancing this session.'
+    : stageGuidance(change.new_status).meaning;
+  if (!meaning) return '';
+  return `<div style="margin-top:10px;font-size:14px;color:${COLOR.text};line-height:1.5;">${escapeHtml(meaning)}</div>`;
+}
+
+/**
  * One branded per-bill card.
  * @param {{ bill_number: string, bill_title: string|null }} change
  * @returns {string}
  */
-function billCard(change) {
+function billCard(change, accent = COLOR.teal) {
   const title = change.bill_title
     ? `<div style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(change.bill_title)}</div>`
     : '';
+  // A newly-failed bill has no useful next action — its meaning line stands alone.
+  const nowDead = Boolean(change.new_dead) && !Boolean(change.old_dead);
+  const action = nowDead ? '' : actionLink(stageGuidance(change.new_status).action, change.bill_id, accent);
   return (
     `<div style="border:1px solid ${COLOR.border};border-radius:8px;` +
     `padding:16px 18px;margin-bottom:12px;background-color:${COLOR.white};">` +
     `<div style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(change.bill_number)}</div>` +
     title +
     statusRow(change) +
+    hearingTodayBanner(change.hearing_today) +
+    meaningLine(change) +
+    action +
     `</div>`
   );
 }
@@ -130,18 +247,28 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bill Tracker</title>
+<title>Hawaiʻi Bill Tracker</title>
 </head>
 <body style="margin:0;padding:0;background-color:${COLOR.cream};font-family:Arial,Helvetica,sans-serif;color:${COLOR.text};">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${COLOR.cream};padding:24px 12px;">
     <tr>
       <td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
-          <!-- Header -->
+          <!-- Header: logo + wordmark -->
           <tr>
             <td style="background-color:${accent};border-radius:12px 12px 0 0;padding:24px 28px;">
-              <div style="color:${COLOR.white};font-size:22px;font-weight:700;letter-spacing:-0.3px;">${escapeHtml(title)}</div>
-              <div style="color:${COLOR.white};opacity:0.85;font-size:14px;margin-top:4px;">${escapeHtml(subtitle)}</div>
+              <table role="presentation" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td style="vertical-align:middle;padding-right:14px;">
+                    <img src="${escapeHtml(LOGO_URL)}" width="48" height="48" alt="Hawaiʻi Bill Tracker"
+                         style="display:block;width:48px;height:48px;border:0;" />
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <div style="color:${COLOR.white};font-size:22px;font-weight:700;letter-spacing:-0.3px;">${escapeHtml(title)}</div>
+                    <div style="color:${COLOR.white};opacity:0.85;font-size:14px;margin-top:4px;">${escapeHtml(subtitle)}</div>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           <!-- Content card -->
@@ -168,7 +295,10 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
           <tr>
             <td style="padding:18px 24px;">
               <p style="margin:0;font-size:12px;color:${COLOR.muted};line-height:1.5;">
-                You are receiving this because you follow these bills in the Bill Tracker.
+                You are receiving this because you follow these bills in the Hawaiʻi Bill Tracker.
+              </p>
+              <p style="margin:10px 0 0;font-size:12px;color:${COLOR.muted};line-height:1.5;">
+                Made by Purple Maiʻa Foundation, ʻĀina Foundry, and Hawaiʻi Food+ Policy.
               </p>
             </td>
           </tr>
@@ -189,11 +319,11 @@ export function buildBillUpdateHtml(changes) {
   const count = changes?.length ?? 0;
   return renderEmailShell({
     accent: COLOR.teal,
-    title: ' Bill Tracker',
+    title: 'Hawaiʻi Bill Tracker',
     subtitle: 'Updates on bills you follow',
     intro: `${count === 1 ? 'A bill you follow' : `${count} bills you follow`} changed status:`,
-    cardsHtml: (changes ?? []).map(billCard).join(''),
-    ctaLabel: 'View in  Bill Tracker',
+    cardsHtml: (changes ?? []).map((c) => billCard(c, COLOR.teal)).join(''),
+    ctaLabel: 'View in Hawaiʻi Bill Tracker',
   });
 }
 
@@ -218,13 +348,14 @@ export function buildDeadlineWarningBody(items, { urgent = false } = {}) {
         `${i.deadline_name} on ${i.deadline_date} — ${i.days_left} day${i.days_left === 1 ? '' : 's'} left`,
     ),
     '',
-    'You are receiving this because you follow these bills in the  bill tracker.',
+    'You are receiving this because you follow these bills in the Hawaiʻi Bill Tracker.',
+    'Made by Purple Maiʻa Foundation, ʻĀina Foundry, and Hawaiʻi Food+ Policy.',
   ].join('\n');
 }
 
 /**
  * One coral deadline-warning card: bill number, title, current status, deadline line.
- * @param {{ bill_number: string, bill_title: string|null, current_status: string|null, deadline_name: string, deadline_date: string, days_left: number }} item
+ * @param {{ bill_id?: string, bill_number: string, bill_title: string|null, current_status: string|null, deadline_name: string, deadline_date: string, days_left: number }} item
  * @returns {string}
  */
 function deadlineCard(item) {
@@ -234,6 +365,11 @@ function deadlineCard(item) {
   const statusPart = item.current_status
     ? `<div style="margin-top:8px;line-height:2;">${statusPill(statusLabel(item.current_status), 'old')}</div>`
     : '';
+  const guidance = stageGuidance(item.current_status);
+  const meaning = guidance.meaning
+    ? `<div style="margin-top:10px;font-size:14px;color:${COLOR.text};line-height:1.5;">${escapeHtml(guidance.meaning)}</div>`
+    : '';
+  const action = actionLink(guidance.action, item.bill_id, COLOR.coral);
   const dayWord = item.days_left === 1 ? 'day' : 'days';
   return (
     `<div style="border:1px solid ${COLOR.border};border-left:4px solid ${COLOR.coral};border-radius:8px;` +
@@ -244,6 +380,8 @@ function deadlineCard(item) {
     `<div style="margin-top:8px;font-size:14px;font-weight:600;color:${COLOR.coral};">` +
     `Deadline: ${escapeHtml(item.deadline_name)} on ${escapeHtml(item.deadline_date)} — ${item.days_left} ${dayWord} left` +
     `</div>` +
+    meaning +
+    action +
     `</div>`
   );
 }
@@ -264,7 +402,7 @@ export function buildDeadlineWarningHtml(items, { urgent = false } = {}) {
       `${count === 1 ? 'A bill you follow is' : `${count} bills you follow are`} ` +
       `approaching a legislative deadline and may die if they don't advance in time:`,
     cardsHtml: (items ?? []).map(deadlineCard).join(''),
-    ctaLabel: 'View in  Bill Tracker',
+    ctaLabel: 'View in Hawaiʻi Bill Tracker',
   });
 }
 
@@ -288,7 +426,7 @@ export async function sendBillUpdateEmail(toEmail, lines, changes) {
   const payload = {
     from: ALERT_FROM,
     to: [toEmail],
-    subject: ` Bill Tracker: ${lines.length} update${lines.length === 1 ? '' : 's'} on bills you follow`,
+    subject: `Hawaiʻi Bill Tracker: ${lines.length} update${lines.length === 1 ? '' : 's'} on bills you follow`,
     text: buildBillUpdateBody(lines),
   };
   if (changes?.length) {
@@ -334,7 +472,7 @@ export async function sendDeadlineWarningEmail(toEmail, items, { urgent = false 
 
   const count = items.length;
   const subject =
-    `${urgent ? 'URGENT — ' : ''} Bill Tracker: deadline approaching for ` +
+    `${urgent ? 'URGENT — ' : ''}Hawaiʻi Bill Tracker: deadline approaching for ` +
     `${count} bill${count === 1 ? '' : 's'} you follow`;
 
   const payload = {

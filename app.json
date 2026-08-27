@@ -2,7 +2,11 @@
     "cron": [
         {
             "command": "npm run cron:scrape",
-            "schedule": "@daily"
+            "schedule": "0 1 * * *"
+        },
+        {
+            "command": "npm run cron:scrape",
+            "schedule": "0 15 * * *"
         }
     ]
 }
