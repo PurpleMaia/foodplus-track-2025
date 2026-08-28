@@ -60,10 +60,11 @@ test('CTA button links to APP_URL', () => {
   assert.match(html, /View in Hawaiʻi Bill Tracker/);
 });
 
-test('header renders the logo image and wordmark', () => {
+test('header renders the logo image (CID inline attachment) and wordmark', () => {
   const html = buildBillUpdateHtml([change()]);
-  const appUrl = process.env.APP_URL || 'https://foodplus.purplemaia.org';
-  assert.ok(html.includes(`${appUrl}/email/foodplus-logo.png`), 'logo src derives from APP_URL');
+  // Logo is embedded via a CID attachment, not hotlinked from APP_URL (which
+  // points at the separate front-facing app and does not host the asset).
+  assert.match(html, /src="cid:foodplus-logo"/, 'logo src is the CID reference');
   assert.match(html, /Hawaiʻi Bill Tracker/);
 });
 
@@ -145,6 +146,27 @@ test('a hearing-today bill renders the highlighted banner with the time', () => 
 test('a bill with no hearing today renders no banner', () => {
   const html = buildBillUpdateHtml([change({ new_status: 'scheduled1', hearing_today: null })]);
   assert.doesNotMatch(html, /Hearing today/i);
+});
+
+test('a hearing today forces the testimony action even when the stage would say contact', () => {
+  // waiting2 alone maps to "Contact the committee members"; a hearing today means
+  // testimony is due now, so the CTA must be Submit testimony (not contact).
+  const html = buildBillUpdateHtml([
+    change({ old_status: 'scheduled1', new_status: 'waiting2', bill_id: 'abc', hearing_today: { date: '2026-09-14', time: '2:00PM' } }),
+  ]);
+  assert.match(html, /Submit testimony/);
+  assert.match(html, /\/bills\/abc\/testimony/, 'links to the testimony route, not contact');
+  assert.doesNotMatch(html, /Contact the committee members/);
+  assert.match(html, /hearing today — the testimony window is open/i, 'meaning matches the hearing-today banner');
+});
+
+test('waiting2 without a hearing today still says contact the committee', () => {
+  const html = buildBillUpdateHtml([
+    change({ old_status: 'scheduled1', new_status: 'waiting2', bill_id: 'abc', hearing_today: null }),
+  ]);
+  assert.match(html, /Contact the committee members/);
+  assert.match(html, /\/bills\/abc\/contact/);
+  assert.doesNotMatch(html, /Submit testimony/);
 });
 
 test('stageGuidance classifies by family with a safe default', () => {

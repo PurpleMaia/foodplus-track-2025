@@ -49,10 +49,9 @@ test('CTA links to APP_URL', () => {
   assert.match(html, /View in Hawaiʻi Bill Tracker/);
 });
 
-test('header renders the logo image and wordmark', () => {
+test('header renders the logo image (CID inline attachment) and wordmark', () => {
   const html = buildDeadlineWarningHtml([item()]);
-  const appUrl = process.env.APP_URL || 'https://foodplus.purplemaia.org';
-  assert.ok(html.includes(`${appUrl}/email/foodplus-logo.png`), 'logo src derives from APP_URL');
+  assert.match(html, /src="cid:foodplus-logo"/, 'logo src is the CID reference');
   assert.match(html, /Hawaiʻi Bill Tracker/);
 });
 

@@ -221,16 +221,43 @@ function hearingTodayBanner(hearing) {
 }
 
 /**
+ * Effective meaning + action for a change, reconciling the stage with live signals
+ * the stage alone doesn't know about:
+ *   - Newly failed → fixed "failed" explanation, no action.
+ *   - Hearing TODAY → the testimony window is open right now, so the action is
+ *     always "Submit testimony" regardless of the stage family (a bill at
+ *     `waiting2` with a hearing today would otherwise wrongly say "contact the
+ *     committee"). This keeps the CTA consistent with the "Hearing today —
+ *     testimony is due now" banner shown on the same card.
+ * @param {{ new_status: string|null, new_dead: boolean|null, old_dead: boolean|null, hearing_today?: object|null }} change
+ * @returns {{ meaning: string, action: { kind: 'testimony'|'contact'|null, label: string|null } }}
+ */
+function effectiveGuidance(change) {
+  const nowDead = Boolean(change.new_dead) && !Boolean(change.old_dead);
+  if (nowDead) {
+    return {
+      meaning: 'This bill failed to meet a legislative deadline and is no longer advancing this session.',
+      action: { kind: null, label: null },
+    };
+  }
+  const base = stageGuidance(change.new_status);
+  if (change.hearing_today) {
+    return {
+      meaning: 'This bill has a committee hearing today — the testimony window is open now.',
+      action: { kind: 'testimony', label: 'Submit testimony' },
+    };
+  }
+  return base;
+}
+
+/**
  * A plain-language line explaining what the bill's new stage means. '' when there's
  * no meaning to show (unknown stage). Dead bills get a fixed "failed" explanation.
- * @param {{ new_status: string|null, new_dead: boolean|null, old_dead: boolean|null }} change
+ * @param {{ new_status: string|null, new_dead: boolean|null, old_dead: boolean|null, hearing_today?: object|null }} change
  * @returns {string}
  */
 function meaningLine(change) {
-  const nowDead = Boolean(change.new_dead) && !Boolean(change.old_dead);
-  const meaning = nowDead
-    ? 'This bill failed to meet a legislative deadline and is no longer advancing this session.'
-    : stageGuidance(change.new_status).meaning;
+  const meaning = effectiveGuidance(change).meaning;
   if (!meaning) return '';
   return `<div style="margin-top:10px;font-size:14px;color:${COLOR.text};line-height:1.5;">${escapeHtml(meaning)}</div>`;
 }
@@ -255,9 +282,10 @@ function billCard(change, accent = COLOR.teal) {
   const title = change.bill_title
     ? `<div style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(change.bill_title)}</div>`
     : '';
-  // A newly-failed bill has no useful next action — its meaning line stands alone.
-  const nowDead = Boolean(change.new_dead) && !Boolean(change.old_dead);
-  const action = nowDead ? '' : actionLink(stageGuidance(change.new_status).action, change.bill_id, accent);
+  // Meaning + action come from the same effective-guidance resolver so they never
+  // disagree (e.g. a hearing today forces "Submit testimony"). A newly-failed bill
+  // resolves to a null action, so no CTA renders.
+  const action = actionLink(effectiveGuidance(change).action, change.bill_id, accent);
   return (
     `<div style="border:1px solid ${COLOR.border};border-radius:8px;` +
     `padding:16px 18px;margin-bottom:12px;background-color:${COLOR.white};">` +
