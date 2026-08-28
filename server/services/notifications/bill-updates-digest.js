@@ -35,14 +35,18 @@ try {
 }
 
 //  brand palette (from app globals.css, HSL → hex). Light-mode values.
+//  Page background is a clean light grey (not near-white cream): the Gmail app
+//  blends near-white surfaces to a muddy dark grey, whereas a light grey page +
+//  PURE-WHITE cards survive Gmail's dark-mode blend far better. Text is pushed to
+//  near-black for contrast that survives the blend.
 const COLOR = {
-  cream: '#FAF8F5',
-  white: '#FFFFFF',
+  cream: '#F1F3F4',     // page background — clean light grey (was #FAF8F5 cream)
+  white: '#FFFFFF',     // cards — pure white (blends cleanly in Gmail dark)
   teal: '#255E6D',
   tealSoft: '#DCE8E8',
-  text: '#2D3436',
-  muted: '#6C757D',
-  border: '#E5E0D8',
+  text: '#1A1D1F',      // near-black body text (was #2D3436)
+  muted: '#5A6167',
+  border: '#D7DBDE',
   coral: '#BE4934',
   olive: '#A8B660',
   gold: '#B8860B',      // "hearing today" highlight (warm, distinct from teal/coral)
@@ -333,15 +337,17 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="color-scheme" content="light dark">
-<meta name="supported-color-schemes" content="light dark">
+<meta name="color-scheme" content="only light">
+<meta name="supported-color-schemes" content="only light">
 <title>Hawaiʻi Bill Tracker</title>
 <style>
-  /* We do NOT switch to a dark palette in dark mode — a dark theme read poorly.
-     Instead we PIN the light appearance (cream page, white cards, dark brand text,
-     teal accent) in clients that honor prefers-color-scheme, so the email looks the
-     same in light and dark. !important is required to win over both inline styles
-     and any client auto-darkening. The title text stays white on the teal header. */
+  /* Dark-mode strategy: keep the LIGHT design everywhere, and make it survive each
+     client's dark treatment rather than switch to a dark palette (which read muddy).
+     - Apple Mail / iOS Mail honor prefers-color-scheme -> we re-pin the light colors.
+     - The Gmail app / Outlook ignore that query and apply their OWN blend; they DO
+       respect the [data-ogsc] (text swap) and [data-ogsb] (background swap) hooks,
+       so we re-pin light surfaces there too. Pure-white cards on a light-grey page
+       blend cleanly; near-white cream did not. The title stays white on teal. */
   @media (prefers-color-scheme: dark) {
     .dm-page   { background-color: ${COLOR.cream} !important; }
     .dm-card   { background-color: ${COLOR.white} !important; border-color: ${COLOR.border} !important; }
@@ -354,6 +360,15 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
     .dm-coral  { color: ${COLOR.coral} !important; }
     .dm-pill-dead { background-color: ${COLOR.coral} !important; color: #FFFFFF !important; }
   }
+  /* Gmail / Outlook dark-mode swap hooks (they inject these attributes). */
+  [data-ogsc] .dm-page  { background-color: ${COLOR.cream} !important; }
+  [data-ogsb] .dm-page  { background-color: ${COLOR.cream} !important; }
+  [data-ogsc] .dm-card  { background-color: ${COLOR.white} !important; }
+  [data-ogsb] .dm-card  { background-color: ${COLOR.white} !important; }
+  [data-ogsc] .dm-text  { color: ${COLOR.text} !important; }
+  [data-ogsc] .dm-muted { color: ${COLOR.muted} !important; }
+  [data-ogsc] .dm-title { color: #FFFFFF !important; }
+  [data-ogsc] .dm-accent { background-color: ${COLOR.teal} !important; }
 </style>
 </head>
 <body class="dm-page" style="margin:0;padding:0;background-color:${COLOR.cream};font-family:Arial,Helvetica,sans-serif;color:${COLOR.text};">

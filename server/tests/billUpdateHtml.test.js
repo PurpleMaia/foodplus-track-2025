@@ -11,7 +11,7 @@ const change = (over) => ({
 test('renders brand palette colors', () => {
   const html = buildBillUpdateHtml([change()]);
   assert.match(html, /#255E6D/, 'deep teal present');
-  assert.match(html, /#FAF8F5/, 'cream background present');
+  assert.match(html, /#F1F3F4/, 'light-grey page background present');
   assert.match(html, /#DCE8E8/, 'teal-soft pill present');
 });
 
