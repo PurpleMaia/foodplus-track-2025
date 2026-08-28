@@ -24,7 +24,12 @@ async function main() {
 
   if (billIds.length > 0) {
     await db.deleteFrom('status_updates').where('bill_id', 'in', billIds).execute();
-    await db.deleteFrom('testimonies').where('bill_id', 'in', billIds).execute();
+    // testimonies belongs to the front-facing app and may not exist here.
+    try {
+      await db.deleteFrom('testimonies').where('bill_id', 'in', billIds).execute();
+    } catch (err) {
+      if (!/relation .*testimonies.* does not exist/i.test(err.message)) throw err;
+    }
     await db.deleteFrom('user_bills').where('bill_id', 'in', billIds).execute();
     await db.deleteFrom('bills').where('id', 'in', billIds).execute();
   }
