@@ -39,15 +39,15 @@ async function main() {
     const url = sentinelUrl(bill.simId);
     const values = {
       bill_number: bill.billNumber,
-      bill_title: `SIM WEEK — ${bill.simId} (${bill.scenario}${bill.isAuto ? ', auto' : ''})`,
+      bill_title: bill.title ?? `SIM WEEK — ${bill.simId} (${bill.scenario}${bill.isAuto ? ', auto' : ''})`,
       committee_assignment: '',
-      description: 'sim week',
+      description: bill.description ?? 'sim week',
       current_status_string: '',
       bill_status: null,
       dead: false,
       archived: false,
       food_related: true,
-      year: 2026,
+      year: 2027,
       updated_at: new Date(),
     };
 
