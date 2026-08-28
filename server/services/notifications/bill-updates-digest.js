@@ -595,18 +595,18 @@ function unifiedCard(item, accent) {
 
 /**
  * Build the full branded HTML for the combined daily digest. Accent is coral when
- * any item is urgent (3-day tier), else teal.
+ * The accent is always the brand dark teal. Urgency is conveyed inside the email
+ * (the coral deadline line and the ordering), not by the header/button color.
  * @param {Array<object>} items - output of mergeDigestItems()
  * @returns {string}
  */
 export function buildDailyDigestHtml(items) {
   const list = items ?? [];
-  const anyUrgent = list.some((i) => i.warning?.tier === '3');
-  const accent = anyUrgent ? COLOR.coral : COLOR.teal;
+  const accent = COLOR.teal;
   const count = list.length;
   return renderEmailShell({
     accent,
-    title: anyUrgent ? 'Daily digest — action needed' : 'Your daily digest',
+    title: 'Your daily digest',
     subtitle: 'Updates & deadlines on bills you follow',
     intro:
       `${count === 1 ? 'A bill you follow needs' : `${count} bills you follow need`} ` +

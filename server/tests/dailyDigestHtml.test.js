@@ -101,12 +101,17 @@ test('html: deadline CTA — scheduled -> testimony, else -> contact', () => {
   assert.match(wait, /\/bills\/w\/contact/);
 });
 
-test('html: accent is coral when any item is urgent, teal otherwise', () => {
+test('html: accent (header + button) is always dark teal, even when urgent', () => {
+  // The header bar uses the accent as its background — assert teal there whether
+  // or not an urgent item is present. Coral still appears as the deadline-line
+  // signal color, so we check the header background specifically.
+  const headerBg = (html) => (html.match(/background-color:(#[0-9A-Fa-f]{6});border-radius:12px 12px 0 0/) || [])[1];
+
   const urgent = buildDailyDigestHtml(mergeDigestItems([], [warning({ tier: '3' })]));
-  assert.match(urgent, /#BE4934/, 'coral accent present when urgent');
+  assert.equal(headerBg(urgent), '#255E6D', 'teal header even when urgent');
 
   const calm = buildDailyDigestHtml(mergeDigestItems([change()], []));
-  assert.match(calm, /#255E6D/, 'teal accent when nothing urgent');
+  assert.equal(headerBg(calm), '#255E6D', 'teal header when nothing urgent');
 });
 
 test('html: a bill both changed and at-risk renders one card with both pills and deadline', () => {
