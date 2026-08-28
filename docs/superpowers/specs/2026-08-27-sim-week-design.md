@@ -372,7 +372,8 @@ run anyway to prove no regression):
   namespaced under `test://sim-week/` (bills) or is a clearly-attributable
   sim testimony/follow row; `reset.js` removes all of it; nothing updates or
   deletes non-sim rows. `seed.js` refuses to run if sim bills already exist
-  unless `--force`.
+  unless `--force`. (`bills.current_status_string` and `committee_assignment`
+  are NOT NULL in the real DB, so day-0 seeds them as `''`.)
 - **Classifier wording drift.** If a hand-written status line doesn't match
   the pattern table, the bill won't reach the intended stage. *Mitigation:*
   the engine unit tests run each produced line through the real

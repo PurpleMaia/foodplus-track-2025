@@ -3,6 +3,8 @@ import { startScraping } from './services/scrapingService.js';
 import { sendAlertEmail } from './services/notifications/cron-alerts.js';
 import { sendStatusChangeNotifications } from './services/notificationService.js';
 import { checkApproachingDeadlines, checkTestimonyDeadlines, sendDeadlineWarnings } from './services/notifications/deadline-warnings.js';
+import { runSimDay } from './services/sim/simRunner.js';
+import { fetchLivingNonSim, fetchLivingNonSimWithStatus } from './services/sim/simDeadlineFetchers.js';
 
 async function cronScrape() {
     const currentYear = new Date().getFullYear();
@@ -67,10 +69,27 @@ async function cronScrape() {
     // Notify followers of any bill status / dead changes detected this run.
     // Merge changes collected across both chambers. Wrapped so a notification
     // failure never fails the scrape.
+    // Sim Week: if today is within the Sept 14–18 sim window, advance the fake
+    // bills through their scenarios and fold their changes into the digest.
+    // Wrapped and isolated (sentinel test://sim-week/ bills) so it never affects
+    // the real scrape. No-op outside the window. See docs/…/sim-week-design.md.
+    let simChanges = [];
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const sim = await runSimDay(today);
+      simChanges = sim.statusChanges;
+      if (sim.simDay > 0) {
+        console.log(`[MAIN] Sim Week day ${sim.simDay}: ${simChanges.length} change(s) across ${sim.summary.length} sim bill(s).`);
+      }
+    } catch (simErr) {
+      console.error('[MAIN] Sim Week advance failed (ignored):', simErr);
+    }
+
     try {
       const allChanges = [
         ...(houseResult?.statusChanges || []),
         ...(senateResult?.statusChanges || []),
+        ...simChanges,
       ];
       const { usersNotified, changesSent } = await sendStatusChangeNotifications(allChanges);
       console.log(`[MAIN] Notifications: ${usersNotified} user(s), ${changesSent} change(s)`);
@@ -92,9 +111,12 @@ async function cronScrape() {
       const today = new Date().toISOString().split('T')[0];
       // Two sources feed the same warning email: approaching legislative deadlines
       // (7-day / 3-day tiers) and testimony windows closing (hearing within ~24h).
+      // Exclude sim bills from the real deadline scan: the real session
+      // deadlines all predate the sim window, so sim bills would otherwise read
+      // as "missed deadline". (See docs/…/sim-week-design.md §5a.)
       const [deadlineWarnings, testimonyWarnings] = await Promise.all([
-        checkApproachingDeadlines(today),
-        checkTestimonyDeadlines(today),
+        checkApproachingDeadlines(today, { fetchBills: fetchLivingNonSim }),
+        checkTestimonyDeadlines(today, { fetchBills: fetchLivingNonSimWithStatus }),
       ]);
       const warnings = [...deadlineWarnings, ...testimonyWarnings];
       const { usersNotified } = await sendDeadlineWarnings(warnings);

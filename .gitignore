@@ -36,6 +36,8 @@ config.toml
 
 # E2E notification seed script transient state (see scripts/seed-e2e-notifications.js)
 scripts/.seed-e2e-snapshot.json
+# Sim Week contact-flag file (see server/services/sim/flagStore.js)
+scripts/.sim-pending.json
 session-deadlines-2026.json.bak
 # send-digest-all-users.js transient seed state
 scripts/.send-digest-snapshot.json
