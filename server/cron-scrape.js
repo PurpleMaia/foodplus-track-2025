@@ -1,8 +1,8 @@
 /* Exclusive file function for cron job to call (same logic as main() in scrapingService.js) */
 import { startScraping } from './services/scrapingService.js';
 import { sendAlertEmail } from './services/notifications/cron-alerts.js';
-import { sendStatusChangeNotifications } from './services/notificationService.js';
-import { checkApproachingDeadlines, checkTestimonyDeadlines, sendDeadlineWarnings } from './services/notifications/deadline-warnings.js';
+import { sendDailyDigest } from './services/notificationService.js';
+import { checkApproachingDeadlines, checkTestimonyDeadlines } from './services/notifications/deadline-warnings.js';
 import { runSimDay } from './services/sim/simRunner.js';
 import { fetchLivingNonSim, fetchLivingNonSimWithStatus } from './services/sim/simDeadlineFetchers.js';
 
@@ -85,50 +85,37 @@ async function cronScrape() {
       console.error('[MAIN] Sim Week advance failed (ignored):', simErr);
     }
 
+    // ONE combined daily digest per user: bills that changed status this run OR
+    // are approaching a deadline. The deadline SCAN still runs here to find
+    // at-risk bills; the two used to be separate emails and are now merged into
+    // a single message. Wrapped so a failure never fails the scrape.
     try {
+      const today = new Date().toISOString().split('T')[0];
       const allChanges = [
         ...(houseResult?.statusChanges || []),
         ...(senateResult?.statusChanges || []),
         ...simChanges,
       ];
-      const { usersNotified, changesSent } = await sendStatusChangeNotifications(allChanges);
-      console.log(`[MAIN] Notifications: ${usersNotified} user(s), ${changesSent} change(s)`);
-    } catch (notifyErr) {
-      console.error('[MAIN] Notification dispatch failed:', notifyErr);
-      await sendAlertEmail('Bill notification dispatch failed', [
-        `The follower notification step failed at ${new Date().toISOString()}.`,
-        '',
-        `Error: ${notifyErr?.message || notifyErr}`,
-        '',
-        notifyErr?.stack || 'No stack trace available',
-      ].join('\n'));
-    }
-
-    // Warn followers of bills approaching a legislative deadline (7-day heads-up,
-    // 3-day urgent). Runs on the fresh bill_status data this scrape just persisted.
-    // Wrapped so a failure never fails the scrape.
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      // Two sources feed the same warning email: approaching legislative deadlines
-      // (7-day / 3-day tiers) and testimony windows closing (hearing within ~24h).
-      // Exclude sim bills from the real deadline scan: the real session
-      // deadlines all predate the sim window, so sim bills would otherwise read
-      // as "missed deadline". (See docs/…/sim-week-design.md §5a.)
+      // Approaching legislative deadlines (7-day / 3-day) + testimony windows
+      // closing. Sim bills are excluded from the real deadline scan: the real
+      // session deadlines all predate the sim window, so they'd read as
+      // "missed deadline". (See docs/…/sim-week-design.md §5a.)
       const [deadlineWarnings, testimonyWarnings] = await Promise.all([
         checkApproachingDeadlines(today, { fetchBills: fetchLivingNonSim }),
         checkTestimonyDeadlines(today, { fetchBills: fetchLivingNonSimWithStatus }),
       ]);
       const warnings = [...deadlineWarnings, ...testimonyWarnings];
-      const { usersNotified } = await sendDeadlineWarnings(warnings);
-      console.log(`[MAIN] Deadline warnings: ${usersNotified} user(s), ${warnings.length} bill(s) (${testimonyWarnings.length} testimony-closing)`);
-    } catch (deadlineErr) {
-      console.error('[MAIN] Deadline warning dispatch failed:', deadlineErr);
-      await sendAlertEmail('Deadline warning dispatch failed', [
-        `The deadline warning step failed at ${new Date().toISOString()}.`,
+
+      const { usersNotified, billsIncluded } = await sendDailyDigest(allChanges, warnings, { today });
+      console.log(`[MAIN] Daily digest: ${usersNotified} user(s), ${billsIncluded} bill(s) (${allChanges.length} change(s), ${warnings.length} at-risk, ${testimonyWarnings.length} testimony-closing)`);
+    } catch (notifyErr) {
+      console.error('[MAIN] Daily digest dispatch failed:', notifyErr);
+      await sendAlertEmail('Daily digest dispatch failed', [
+        `The daily digest notification step failed at ${new Date().toISOString()}.`,
         '',
-        `Error: ${deadlineErr?.message || deadlineErr}`,
+        `Error: ${notifyErr?.message || notifyErr}`,
         '',
-        deadlineErr?.stack || 'No stack trace available',
+        notifyErr?.stack || 'No stack trace available',
       ].join('\n'));
     }
 }

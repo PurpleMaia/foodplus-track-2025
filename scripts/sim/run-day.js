@@ -13,8 +13,8 @@
 
 import { db } from '../../db/kysely/client.js';
 import { runSimDay } from '../../server/services/sim/simRunner.js';
-import { sendStatusChangeNotifications } from '../../server/services/notificationService.js';
-import { checkApproachingDeadlines, checkTestimonyDeadlines, sendDeadlineWarnings } from '../../server/services/notifications/deadline-warnings.js';
+import { sendDailyDigest } from '../../server/services/notificationService.js';
+import { checkApproachingDeadlines, checkTestimonyDeadlines } from '../../server/services/notifications/deadline-warnings.js';
 import { ROSTER } from '../../server/services/sim/scenarios.js';
 import { sentinelUrl } from '../../server/services/sim/simRunner.js';
 
@@ -85,9 +85,8 @@ async function main() {
     return;
   }
 
-  if (statusChanges.length) await sendStatusChangeNotifications(statusChanges, { today: date });
-  if (warnings.length) await sendDeadlineWarnings(warnings);
-  console.log('Notifications dispatched (subject to RESEND_API_KEY).');
+  await sendDailyDigest(statusChanges, warnings, { today: date });
+  console.log('Daily digest dispatched (subject to RESEND_API_KEY).');
   await db.destroy();
 }
 

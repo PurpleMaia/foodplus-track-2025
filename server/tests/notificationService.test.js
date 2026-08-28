@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupChangesByUser, sendStatusChangeNotifications } from '../services/notificationService.js';
+import { groupChangesByUser, sendStatusChangeNotifications, sendDailyDigest } from '../services/notificationService.js';
 
 const change = (over) => ({
   bill_id: 'b1', bill_number: 'HB1', bill_title: 'One',
@@ -160,4 +160,79 @@ test('sendStatusChangeNotifications: changes present but no followers → no ema
   assert.equal(calls.length, 0, 'no emails when no followers');
   assert.equal(result.usersNotified, 0);
   assert.equal(result.changesSent, 1);
+});
+
+// ---------------------------------------------------------------------------
+// sendDailyDigest — one combined email (status changes + deadline warnings)
+// ---------------------------------------------------------------------------
+const mkWarning = (over) => ({
+  bill: { id: 'b2', bill_number: 'HB2', bill_title: 'Two', bill_status: 'waiting2' },
+  nextName: 'First Lateral', nextDate: '2026-09-20', daysLeft: 2, tier: '3', ...over,
+});
+
+test('sendDailyDigest: a user following a changed bill AND an at-risk bill gets ONE email with both items', async () => {
+  const calls = [];
+  const fakeSend = async (email, items) => calls.push({ email, items });
+  const fakeFollowers = async () => [
+    { bill_id: 'b1', user_id: 'u1', email: 'u1@test.com' },
+    { bill_id: 'b2', user_id: 'u1', email: 'u1@test.com' },
+  ];
+
+  const result = await sendDailyDigest(
+    [mkChange({ bill_id: 'b1', bill_number: 'HB1' })],
+    [mkWarning({})],
+    { fetchFollowers: fakeFollowers, fetchHearingsToday: noHearings, sendEmail: fakeSend },
+  );
+
+  assert.equal(calls.length, 1, 'one combined email for the user');
+  assert.equal(calls[0].items.length, 2, 'both bills present');
+  const byId = Object.fromEntries(calls[0].items.map((i) => [i.bill_id, i]));
+  assert.ok(byId.b1.change && !byId.b1.warning, 'b1 is change-only');
+  assert.ok(byId.b2.warning && !byId.b2.change, 'b2 is warning-only');
+  assert.equal(result.usersNotified, 1);
+  assert.equal(result.billsIncluded, 2);
+});
+
+test('sendDailyDigest: a bill that both changed and is at-risk becomes ONE merged item', async () => {
+  const calls = [];
+  const fakeSend = async (email, items) => calls.push({ email, items });
+  const fakeFollowers = async () => [{ bill_id: 'b9', user_id: 'u1', email: 'u1@test.com' }];
+
+  await sendDailyDigest(
+    [mkChange({ bill_id: 'b9', bill_number: 'HB9' })],
+    [mkWarning({ bill: { id: 'b9', bill_number: 'HB9', bill_title: 'Nine', bill_status: 'scheduled1' } })],
+    { fetchFollowers: fakeFollowers, fetchHearingsToday: noHearings, sendEmail: fakeSend },
+  );
+
+  assert.equal(calls[0].items.length, 1, 'one merged card');
+  assert.ok(calls[0].items[0].change && calls[0].items[0].warning, 'carries both change and warning');
+});
+
+test('sendDailyDigest: when a bill has both a testimony and a legislative warning, testimony wins its slot', async () => {
+  const calls = [];
+  const fakeSend = async (email, items) => calls.push({ email, items });
+  const fakeFollowers = async () => [{ bill_id: 'b2', user_id: 'u1', email: 'u1@test.com' }];
+
+  await sendDailyDigest(
+    [],
+    [
+      mkWarning({ nextName: 'First Lateral', tier: '7', daysLeft: 6, testimony: false }),
+      mkWarning({ nextName: 'Testimony deadline', tier: '3', daysLeft: 0, testimony: true }),
+    ],
+    { fetchFollowers: fakeFollowers, fetchHearingsToday: noHearings, sendEmail: fakeSend },
+  );
+
+  assert.equal(calls[0].items.length, 1);
+  assert.equal(calls[0].items[0].warning.deadline_name, 'Testimony deadline', 'testimony warning wins');
+});
+
+test('sendDailyDigest: nothing to send when there are no changes and no warnings', async () => {
+  const calls = [];
+  const result = await sendDailyDigest([], [], {
+    fetchFollowers: async () => [],
+    fetchHearingsToday: noHearings,
+    sendEmail: async (...a) => calls.push(a),
+  });
+  assert.equal(calls.length, 0);
+  assert.equal(result.usersNotified, 0);
 });

@@ -21,7 +21,7 @@
 import { createInterface } from 'node:readline';
 import { db } from '../../db/kysely/client.js';
 import { runSimDay } from '../../server/services/sim/simRunner.js';
-import { sendStatusChangeNotifications } from '../../server/services/notificationService.js';
+import { sendDailyDigest } from '../../server/services/notificationService.js';
 import { SIM_DATES } from '../../server/services/sim/scenarios.js';
 
 const dry = process.argv.includes('--dry');
@@ -47,7 +47,7 @@ async function main() {
     console.log(`Status changes: ${statusChanges.length}${dry ? ' [dry: no email]' : ''}`);
 
     if (!dry && statusChanges.length) {
-      await sendStatusChangeNotifications(statusChanges, { today: date });
+      await sendDailyDigest(statusChanges, [], { today: date });
     }
 
     if (i < SIM_DATES.length - 1) {

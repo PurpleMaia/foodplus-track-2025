@@ -1,7 +1,7 @@
 import { sql } from 'kysely';
 import { db } from '../../db/kysely/client.js';
 import { describeChange } from './statusChange.js';
-import { sendBillUpdateEmail } from './notifications/bill-updates-digest.js';
+import { sendBillUpdateEmail, sendDailyDigestEmail, mergeDigestItems } from './notifications/bill-updates-digest.js';
 import { hearingToday } from './notifications/hearing-schedule.js';
 
 /**
@@ -117,4 +117,95 @@ export async function sendStatusChangeNotifications(changes, { fetchFollowers = 
 
   console.log(`[NOTIFY] Notified ${usersNotified} user(s) across ${changes.length} change(s)`);
   return { usersNotified, changesSent: changes.length };
+}
+
+/**
+ * Normalize a raw deadline-warning (from checkApproachingDeadlines /
+ * checkTestimonyDeadlines) into the flat item shape the digest renderer expects.
+ * @param {{ bill: object, nextName: string, nextDate: string, daysLeft: number, tier: string, testimony?: boolean }} w
+ * @returns {object}
+ */
+function warningToItem(w) {
+  return {
+    bill_id: w.bill.id,
+    bill_number: w.bill.bill_number,
+    bill_title: w.bill.bill_title,
+    current_status: w.bill.bill_status,
+    deadline_name: w.nextName,
+    deadline_date: w.nextDate,
+    days_left: w.daysLeft,
+    tier: w.tier,
+  };
+}
+
+/**
+ * ONE combined daily digest per user: every bill they follow that either changed
+ * status this run OR is approaching a deadline. Replaces the two separate emails
+ * (status digest + deadline warnings) with a single message.
+ *
+ * A bill in both lists appears once, carrying both its change and its warning.
+ * When a bill has multiple warnings (e.g. a legislative deadline AND a testimony
+ * window), the more urgent / testimony one wins its slot.
+ *
+ * @param {Array<object>} changes - computeChange records from the scrape
+ * @param {Array<object>} warnings - raw warnings from the deadline scanners
+ * @param {{ fetchFollowers?, fetchHearingsToday?, today?, sendEmail? }} [deps]
+ * @returns {Promise<{ usersNotified: number, billsIncluded: number }>}
+ */
+export async function sendDailyDigest(changes = [], warnings = [], {
+  fetchFollowers = defaultFetchFollowers,
+  fetchHearingsToday = defaultFetchHearingsToday,
+  today = new Date().toISOString().split('T')[0],
+  sendEmail = sendDailyDigestEmail,
+} = {}) {
+  // Collapse warnings to one item per bill (testimony / more-urgent wins).
+  const warnItemByBill = new Map();
+  const rank = (t, testimony) => (testimony ? 0 : t === '3' ? 1 : 2);
+  for (const w of warnings ?? []) {
+    const item = warningToItem(w);
+    const existing = warnItemByBill.get(item.bill_id);
+    if (!existing || rank(item.tier, w.testimony) < rank(existing.tier, existing._testimony)) {
+      item._testimony = w.testimony;
+      warnItemByBill.set(item.bill_id, item);
+    }
+  }
+  const warnItems = [...warnItemByBill.values()];
+
+  const billIds = [...new Set([...(changes ?? []).map((c) => c.bill_id), ...warnItems.map((w) => w.bill_id)])];
+  if (billIds.length === 0) {
+    console.log('[NOTIFY] Daily digest: nothing to send');
+    return { usersNotified: 0, billsIncluded: 0 };
+  }
+
+  const followers = await fetchFollowers(billIds);
+  if (followers.length === 0) {
+    console.log(`[NOTIFY] Daily digest: ${billIds.length} bill(s) but no followers`);
+    return { usersNotified: 0, billsIncluded: billIds.length };
+  }
+
+  // Annotate changes with hearing-today so the card can banner it.
+  const hearings = await fetchHearingsToday(billIds, today);
+  const changeByBill = new Map((changes ?? []).map((c) => [c.bill_id, { ...c, hearing_today: hearings.get(c.bill_id) ?? null }]));
+
+  // Bucket each user's changes + warnings, then merge + send one email.
+  const byUser = new Map();
+  for (const f of followers) {
+    if (!f.email) continue;
+    if (!byUser.has(f.user_id)) byUser.set(f.user_id, { email: f.email, changes: [], warnings: [] });
+    const entry = byUser.get(f.user_id);
+    if (changeByBill.has(f.bill_id)) entry.changes.push(changeByBill.get(f.bill_id));
+    const w = warnItemByBill.get(f.bill_id);
+    if (w) entry.warnings.push(w);
+  }
+
+  let usersNotified = 0;
+  for (const { email, changes: uChanges, warnings: uWarnings } of byUser.values()) {
+    const items = mergeDigestItems(uChanges, uWarnings);
+    if (items.length === 0) continue;
+    await sendEmail(email, items);
+    usersNotified++;
+  }
+
+  console.log(`[NOTIFY] Daily digest: ${usersNotified} user(s) across ${billIds.length} bill(s)`);
+  return { usersNotified, billsIncluded: billIds.length };
 }

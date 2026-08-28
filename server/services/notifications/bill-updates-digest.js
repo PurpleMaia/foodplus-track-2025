@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { statusLabel, diffBillState } from '../statusChange.js';
+import { statusLabel, diffBillState, describeChange } from '../statusChange.js';
 dotenv.config();
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -460,7 +460,7 @@ function deadlineCard(item) {
   const action = actionLink(deadlineAction(item.current_status), item.bill_id, COLOR.coral);
   const dayWord = item.days_left === 1 ? 'day' : 'days';
   return (
-    `<div style="border:1px solid ${COLOR.border};border-left:4px solid ${COLOR.coral};border-radius:8px;` +
+    `<div style="border:1px solid ${COLOR.border};border-radius:8px;` +
     `padding:16px 18px;margin-bottom:12px;background-color:${COLOR.white};">` +
     `<div style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(item.bill_number)}</div>` +
     title +
@@ -492,6 +492,203 @@ export function buildDeadlineWarningHtml(items, { urgent = false } = {}) {
     cardsHtml: (items ?? []).map(deadlineCard).join(''),
     ctaLabel: 'View in Hawaiʻi Bill Tracker',
   });
+}
+
+// ===========================================================================
+// Unified daily digest — one email combining status changes AND deadline
+// warnings. A bill can carry either or both. See sendDailyDigest() below and
+// the design in the sim-week/notification specs.
+// ===========================================================================
+
+/** Constant subject — a plain daily-digest line with no counts or per-day detail. */
+export const DAILY_DIGEST_SUBJECT = 'Your Hawaiʻi Bill Tracker daily digest';
+
+/** Rank for ordering merged items: urgent (3-day) first, then 7-day, then changed-only. */
+function digestRank(item) {
+  if (item.warning?.tier === '3') return 0;
+  if (item.warning?.tier === '7') return 1;
+  return 2;
+}
+
+/**
+ * Merge status changes and deadline warnings into one ordered list of per-bill
+ * items, deduped by bill_id. A bill present in both lists yields ONE item
+ * carrying both its `change` and its `warning`. Ordered urgent-first (see
+ * digestRank). Pure — no DB.
+ *
+ * @param {Array<object>} changes - computeChange records (may include hearing_today)
+ * @param {Array<object>} warnings - deadline items ({ bill_id, current_status, deadline_name, deadline_date, days_left, tier })
+ * @returns {Array<{ bill_id: string, bill_number: string, bill_title: string|null, change: object|null, warning: object|null, hearing_today: object|null }>}
+ */
+export function mergeDigestItems(changes = [], warnings = []) {
+  const byBill = new Map();
+
+  const ensure = (bill_id, bill_number, bill_title) => {
+    if (!byBill.has(bill_id)) {
+      byBill.set(bill_id, { bill_id, bill_number, bill_title: bill_title ?? null, change: null, warning: null, hearing_today: null });
+    }
+    return byBill.get(bill_id);
+  };
+
+  for (const c of changes ?? []) {
+    const it = ensure(c.bill_id, c.bill_number, c.bill_title);
+    it.change = c;
+    if (c.hearing_today) it.hearing_today = c.hearing_today;
+  }
+  for (const w of warnings ?? []) {
+    const it = ensure(w.bill_id, w.bill_number, w.bill_title);
+    it.warning = w;
+  }
+
+  return [...byBill.values()].sort((a, b) => digestRank(a) - digestRank(b));
+}
+
+/** The deadline line for a merged item's warning, or '' when it has none. */
+function deadlineLine(warning) {
+  if (!warning) return '';
+  const dayWord = warning.days_left === 1 ? 'day' : 'days';
+  return (
+    `<div style="margin-top:8px;font-size:14px;font-weight:600;color:${COLOR.coral};">` +
+    `Deadline: ${escapeHtml(warning.deadline_name)} on ${escapeHtml(warning.deadline_date)} — ${warning.days_left} ${dayWord} left` +
+    `</div>`
+  );
+}
+
+/**
+ * One unified card for a merged item. Shows status pills + meaning when the bill
+ * changed, and a deadline line when it's at-risk (both when both). A single CTA:
+ *   - at-risk → the deadline rule (scheduled → testimony, else contact)
+ *   - changed only → the effective-guidance rule (hearing today → testimony, etc.)
+ * @param {{ bill_id: string, bill_number: string, bill_title: string|null, change: object|null, warning: object|null, hearing_today: object|null }} item
+ * @param {string} accent
+ * @returns {string}
+ */
+function unifiedCard(item, accent) {
+  const title = item.bill_title
+    ? `<div style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(item.bill_title)}</div>`
+    : '';
+
+  // Status pills + raw line + meaning only when the bill changed this run.
+  const changeParts = item.change
+    ? statusRow(item.change) + rawStatusLine(item.change.raw_status) + meaningLine({ ...item.change, hearing_today: item.hearing_today })
+    : (item.warning?.current_status
+        ? `<div style="margin-top:8px;line-height:2;">${statusPill(statusLabel(item.warning.current_status), 'old')}</div>`
+        : '');
+
+  // One CTA. At-risk bills use the deadline rule; otherwise the change rule.
+  const action = item.warning
+    ? actionLink(deadlineAction(item.warning.current_status), item.bill_id, accent)
+    : actionLink(effectiveGuidance({ ...item.change, hearing_today: item.hearing_today }).action, item.bill_id, accent);
+
+  return (
+    `<div style="border:1px solid ${COLOR.border};border-radius:8px;` +
+    `padding:16px 18px;margin-bottom:12px;background-color:${COLOR.white};">` +
+    `<div style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(item.bill_number)}</div>` +
+    title +
+    changeParts +
+    hearingTodayBanner(item.hearing_today) +
+    deadlineLine(item.warning) +
+    action +
+    `</div>`
+  );
+}
+
+/**
+ * Build the full branded HTML for the combined daily digest. Accent is coral when
+ * any item is urgent (3-day tier), else teal.
+ * @param {Array<object>} items - output of mergeDigestItems()
+ * @returns {string}
+ */
+export function buildDailyDigestHtml(items) {
+  const list = items ?? [];
+  const anyUrgent = list.some((i) => i.warning?.tier === '3');
+  const accent = anyUrgent ? COLOR.coral : COLOR.teal;
+  const count = list.length;
+  return renderEmailShell({
+    accent,
+    title: anyUrgent ? 'Daily digest — action needed' : 'Your daily digest',
+    subtitle: 'Updates & deadlines on bills you follow',
+    intro:
+      `${count === 1 ? 'A bill you follow needs' : `${count} bills you follow need`} ` +
+      `your attention — status changes and approaching deadlines:`,
+    cardsHtml: list.map((i) => unifiedCard(i, accent)).join(''),
+    ctaLabel: 'View in Hawaiʻi Bill Tracker',
+  });
+}
+
+/**
+ * Plain-text fallback for the combined daily digest.
+ * @param {Array<object>} items - output of mergeDigestItems()
+ * @returns {string}
+ */
+export function buildDailyDigestBody(items) {
+  const list = items ?? [];
+  const lines = list.map((i) => {
+    const parts = [];
+    if (i.change) {
+      parts.push(describeChange({
+        billNumber: i.change.bill_number,
+        billTitle: i.change.bill_title,
+        oldStatus: i.change.old_status,
+        newStatus: i.change.new_status,
+        oldDead: i.change.old_dead,
+        newDead: i.change.new_dead,
+      }));
+    } else {
+      parts.push(`${i.bill_number}${i.bill_title ? ` (${i.bill_title})` : ''}`);
+    }
+    if (i.warning) {
+      const dayWord = i.warning.days_left === 1 ? 'day' : 'days';
+      parts.push(`deadline: ${i.warning.deadline_name} on ${i.warning.deadline_date} — ${i.warning.days_left} ${dayWord} left`);
+    }
+    return `- ${parts.join(' · ')}`;
+  });
+  return [
+    'Your daily digest — bills you follow:',
+    '',
+    ...lines,
+    '',
+    'You are receiving this because you follow these bills in the Hawaiʻi Bill Tracker.',
+    'Made by Purple Maiʻa Foundation, ʻĀina Foundry, and Hawaiʻi Food+ Policy.',
+  ].join('\n');
+}
+
+/**
+ * Send the combined daily digest to a single user via Resend.
+ * @param {string} toEmail
+ * @param {Array<object>} items - output of mergeDigestItems()
+ */
+export async function sendDailyDigestEmail(toEmail, items) {
+  if (!RESEND_API_KEY) {
+    console.error('[NOTIFY] RESEND_API_KEY not set — skipping daily digest email');
+    return;
+  }
+  if (!toEmail || !items?.length) return;
+
+  const payload = {
+    from: ALERT_FROM,
+    to: [toEmail],
+    subject: DAILY_DIGEST_SUBJECT,
+    text: buildDailyDigestBody(items),
+    html: buildDailyDigestHtml(items),
+  };
+  if (LOGO_ATTACHMENT) payload.attachments = [LOGO_ATTACHMENT];
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[NOTIFY] Resend API error (${response.status}) for ${toEmail}: ${errorText}`);
+    } else {
+      console.log(`[NOTIFY] Daily digest sent to ${toEmail} (${items.length} bill(s))`);
+    }
+  } catch (error) {
+    console.error(`[NOTIFY] Failed to send daily digest to ${toEmail}:`, error.message);
+  }
 }
 
 /**
