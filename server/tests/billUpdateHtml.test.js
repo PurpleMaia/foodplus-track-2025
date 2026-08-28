@@ -32,7 +32,7 @@ test('newly-dead change renders a FAILED pill (not DEAD) and a failed explanatio
   const html = buildBillUpdateHtml([
     change({ old_status: 'waiting2', new_status: 'waiting2', new_dead: true }),
   ]);
-  assert.match(html, /#EF6B4D/, 'coral present');
+  assert.match(html, /#BE4934/, 'coral present');
   assert.match(html, /FAILED/);
   assert.doesNotMatch(html, /DEAD/, 'the word DEAD is retired in favor of FAILED');
   assert.match(html, /failed to meet a legislative deadline/i, 'explains the failure');

@@ -13,7 +13,7 @@ const item = (over) => ({
 
 test('renders coral accent and deadline line', () => {
   const html = buildDeadlineWarningHtml([item()]);
-  assert.match(html, /#EF6B4D/, 'coral present');
+  assert.match(html, /#BE4934/, 'coral present');
   assert.match(html, /First Decking/);
   assert.match(html, /2026-03-06/);
   assert.match(html, /7 days left/);

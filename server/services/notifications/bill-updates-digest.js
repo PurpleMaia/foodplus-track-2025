@@ -43,7 +43,7 @@ const COLOR = {
   text: '#2D3436',
   muted: '#6C757D',
   border: '#E5E0D8',
-  coral: '#EF6B4D',
+  coral: '#BE4934',
   olive: '#A8B660',
   gold: '#B8860B',      // "hearing today" highlight (warm, distinct from teal/coral)
   goldSoft: '#FBF3DC',  // its soft background
