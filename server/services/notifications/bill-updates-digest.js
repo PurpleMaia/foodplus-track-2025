@@ -1,13 +1,38 @@
 import dotenv from 'dotenv';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { statusLabel, diffBillState } from '../statusChange.js';
 dotenv.config();
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const ALERT_FROM = process.env.ALERT_FROM || 'Hawaiʻi Bill Tracker <onboarding@resend.dev>';
 const APP_URL = process.env.APP_URL || 'https://foodplus.purplemaia.org';
-// Logo lives in public/email/ → copied verbatim into dist/ by Vite and served
-// statically by Express, so it resolves under whatever APP_URL is deployed to.
-const LOGO_URL = `${APP_URL.replace(/\/$/, '')}/email/foodplus-logo.png`;
+
+// The logo is embedded as a CID inline attachment rather than hotlinked. A
+// remote <img src> only works if APP_URL serves this repo's public/email/ dir —
+// but APP_URL points at the separate front-facing app, which does not host it
+// (every /email/*.png path 404s), so the logo never rendered. Embedding via
+// cid: removes the hosting dependency entirely and renders in Gmail too (unlike
+// a base64 data: URI, which Gmail strips).
+const LOGO_CID = 'foodplus-logo';
+const LOGO_SRC = `cid:${LOGO_CID}`;
+
+// Load the PNG once at module init. Path is relative to this file so it works
+// from both the source tree and a build. If it's ever missing, fall back to no
+// attachment (the alt text still shows) rather than crashing the send.
+const __dirname = dirname(fileURLToPath(import.meta.url));
+let LOGO_ATTACHMENT = null;
+try {
+  const logoPath = resolve(__dirname, '../../../public/email/foodplus-logo.png');
+  LOGO_ATTACHMENT = {
+    filename: 'foodplus-logo.png',
+    content: readFileSync(logoPath).toString('base64'),
+    content_id: LOGO_CID,
+  };
+} catch (err) {
+  console.error('[NOTIFY] logo asset not found; emails will send without an embedded logo:', err.message);
+}
 
 //  brand palette (from app globals.css, HSL → hex).
 const COLOR = {
@@ -272,7 +297,7 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;padding-right:14px;">
-                    <img src="${escapeHtml(LOGO_URL)}" width="48" height="48" alt="Hawaiʻi Bill Tracker"
+                    <img src="${LOGO_SRC}" width="48" height="48" alt="Hawaiʻi Bill Tracker"
                          style="display:block;width:48px;height:48px;border:0;" />
                   </td>
                   <td style="vertical-align:middle;">
@@ -443,6 +468,7 @@ export async function sendBillUpdateEmail(toEmail, lines, changes) {
   };
   if (changes?.length) {
     payload.html = buildBillUpdateHtml(changes);
+    if (LOGO_ATTACHMENT) payload.attachments = [LOGO_ATTACHMENT];
   }
 
   try {
@@ -494,6 +520,7 @@ export async function sendDeadlineWarningEmail(toEmail, items, { urgent = false 
     text: buildDeadlineWarningBody(items, { urgent }),
     html: buildDeadlineWarningHtml(items, { urgent }),
   };
+  if (LOGO_ATTACHMENT) payload.attachments = [LOGO_ATTACHMENT];
 
   try {
     const response = await fetch('https://api.resend.com/emails', {
