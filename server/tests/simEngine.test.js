@@ -120,6 +120,65 @@ test('S2 user full happy path: reaches passedCommittees by day 4 with all action
 });
 
 // ---------------------------------------------------------------------------
+// Testimony must NOT move a bill that isn't SCHEDULED. People can submit
+// testimony before a hearing is scheduled; that early testimony must not
+// advance the bill — the bill must be in a scheduled state first.
+// ---------------------------------------------------------------------------
+test('testify checkpoint entered from a NON-scheduled state does not advance on support', () => {
+  // A synthetic scenario whose testify step is reached while the bill is still
+  // in a waiting (not scheduled) state — the guard must refuse to advance it.
+  const scenarioEarlyTestify = {
+    id: 'earlyTestify',
+    history: [],
+    steps: [
+      { day: 1, label: 'Introduced & Waiting', targetStage: 'introduced',
+        advance: [
+          { chamber: 'H', statustext: 'Introduced and passed First Reading.' },
+          { chamber: 'H', statustext: 'Referred to JHA, referral sheet 1.' },
+        ] },
+      // Testify BEFORE any hearing is scheduled — bill is still "introduced"/waiting.
+      { day: 2, label: 'Hearing (too early)', targetStage: 'waiting2',
+        requiredAction: 'testify',
+        advance: [{ chamber: 'H', statustext: 'The committee(s) on JHA recommend(s) that the measure be PASSED, unamended.' }],
+        deathLine: { chamber: 'H', statustext: 'The committee(s) on JHA deferred the measure.' } },
+    ],
+  };
+  const scenariosWithEarly = { ...SCENARIOS, earlyTestify: scenarioEarlyTestify };
+  const bill = { simId: 'SIM-X', billNumber: 'HB9999', scenario: 'earlyTestify', isAuto: false };
+
+  const { dead } = buildBillLog(bill, 2, { stance: 'support' }, scenariosWithEarly);
+  // Support testimony is present, but the bill was NOT scheduled entering day 2,
+  // so it must NOT advance — it dies (deferral) instead of moving to waiting2.
+  assert.equal(dead, true, 'early testimony must not advance an unscheduled bill');
+});
+
+test('testify checkpoint entered from a SCHEDULED state advances on support (control)', () => {
+  // Same shape but with a scheduling step before the testify step — support advances.
+  const scenarioScheduledFirst = {
+    id: 'scheduledFirst',
+    history: [],
+    steps: [
+      { day: 1, label: 'Hearing Notice', targetStage: 'scheduled1',
+        advance: [
+          { chamber: 'H', statustext: 'Introduced and passed First Reading.' },
+          { chamber: 'H', statustext: 'Referred to JHA, referral sheet 1.' },
+          { chamber: 'H', statustext: 'The committee(s) on JHA has scheduled a public hearing on 09-15-26 2:00PM.' },
+        ] },
+      { day: 2, label: 'Hearing', targetStage: 'waiting2',
+        requiredAction: 'testify',
+        advance: [{ chamber: 'H', statustext: 'The committee(s) on JHA recommend(s) that the measure be PASSED, unamended.' }],
+        deathLine: { chamber: 'H', statustext: 'The committee(s) on JHA deferred the measure.' } },
+    ],
+  };
+  const scenarios = { ...SCENARIOS, scheduledFirst: scenarioScheduledFirst };
+  const bill = { simId: 'SIM-Y', billNumber: 'HB9998', scenario: 'scheduledFirst', isAuto: false };
+
+  const { dead, updates } = buildBillLog(bill, 2, { stance: 'support' }, scenarios);
+  assert.equal(dead, false, 'scheduled bill advances on support');
+  assert.equal(stageOf(bill.billNumber, updates), 'waiting2');
+});
+
+// ---------------------------------------------------------------------------
 // Idempotency: re-running a day is identical; day N log extends day N-1
 // ---------------------------------------------------------------------------
 test('idempotent: same (bill, day, actions) yields identical log', () => {

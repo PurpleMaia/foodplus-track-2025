@@ -31,15 +31,29 @@ export function normalizeStance(position) {
   return 'oppose';
 }
 
+/** A "scheduled for a hearing" stage — the only state from which testimony can move a bill. */
+function isScheduledStage(stage) {
+  return /^(crossover)?[Ss]cheduled\d$/.test(stage || '') || stage === 'conferenceScheduled';
+}
+
 /**
  * Is a checkpoint satisfied for a user-driven bill?
+ *
+ * `currentStage` is the bill's stage ENTERING this step. It gates testimony:
+ * testimony can only move a bill that is already SCHEDULED for a hearing. People
+ * can submit testimony before a hearing is scheduled; that early testimony must
+ * not advance the bill (the hearing has to be scheduled first).
+ *
  * @param {'contact'|'testify'} requiredAction
  * @param {{ contacted?: boolean, stance?: ('support'|'oppose'|null) }} actions
+ * @param {string|null} currentStage - stage entering the step
  * @returns {boolean}
  */
-function checkpointPassed(requiredAction, actions) {
+function checkpointPassed(requiredAction, actions, currentStage) {
   if (requiredAction === 'contact') return actions.contacted === true;
-  if (requiredAction === 'testify') return actions.stance === 'support';
+  if (requiredAction === 'testify') {
+    return isScheduledStage(currentStage) && actions.stance === 'support';
+  }
   return true;
 }
 
@@ -64,8 +78,8 @@ function stamp(line, date) {
  *   reachedStage: the intended targetStage of the last advancing step (for
  *     assertions / logging; the real classifier is still the source of truth).
  */
-export function buildBillLog(bill, simDay, actions = {}) {
-  const scenario = SCENARIOS[bill.scenario];
+export function buildBillLog(bill, simDay, actions = {}, scenarios = SCENARIOS) {
+  const scenario = scenarios[bill.scenario];
   if (!scenario) throw new Error(`unknown scenario: ${bill.scenario}`);
 
   const day = Math.min(simDay, SIM_DATES.length);
@@ -76,6 +90,13 @@ export function buildBillLog(bill, simDay, actions = {}) {
   // Any date strictly before SIM_DATES[0] works for ordering; use a fixed lead date.
   const historyDate = '2026-09-08';
   for (const line of scenario.history) chron.push(stamp(line, historyDate));
+
+  // The stage the bill is currently in. Testify checkpoints require this to be a
+  // scheduled stage. Back-history that schedules a hearing (scenario 2) starts the
+  // bill scheduled; otherwise it starts unscheduled.
+  let currentStage = scenario.history.some((l) => /has scheduled a public hearing|scheduled to be heard/i.test(l.statustext))
+    ? 'scheduled1'
+    : null;
 
   let dead = false;
   let reachedStage = null;
@@ -90,11 +111,12 @@ export function buildBillLog(bill, simDay, actions = {}) {
     const passed = !gated || checkpointPassed(step.requiredAction, {
       contacted: actions.contacted,
       stance: actions.stance ?? null,
-    });
+    }, currentStage);
 
     if (passed) {
       for (const line of step.advance) chron.push(stamp(line, date));
       reachedStage = step.targetStage;
+      currentStage = step.targetStage; // advance the tracked stage
     } else {
       // Checkpoint failed: inject the death line and stop advancing.
       if (step.deathLine) chron.push(stamp(step.deathLine, date));
