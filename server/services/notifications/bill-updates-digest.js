@@ -38,12 +38,12 @@ try {
 const COLOR = {
   cream: '#FAF8F5',
   white: '#FFFFFF',
-  teal: '#1F5C5E',
+  teal: '#255E6D',
   tealSoft: '#DCE8E8',
   text: '#2D3436',
   muted: '#6C757D',
   border: '#E5E0D8',
-  coral: '#C97474',
+  coral: '#EF6B4D',
   olive: '#A8B660',
   gold: '#B8860B',      // "hearing today" highlight (warm, distinct from teal/coral)
   goldSoft: '#FBF3DC',  // its soft background

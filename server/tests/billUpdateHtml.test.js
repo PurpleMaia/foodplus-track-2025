@@ -10,7 +10,7 @@ const change = (over) => ({
 
 test('renders brand palette colors', () => {
   const html = buildBillUpdateHtml([change()]);
-  assert.match(html, /#1F5C5E/, 'deep teal present');
+  assert.match(html, /#255E6D/, 'deep teal present');
   assert.match(html, /#FAF8F5/, 'cream background present');
   assert.match(html, /#DCE8E8/, 'teal-soft pill present');
 });
@@ -32,7 +32,7 @@ test('newly-dead change renders a FAILED pill (not DEAD) and a failed explanatio
   const html = buildBillUpdateHtml([
     change({ old_status: 'waiting2', new_status: 'waiting2', new_dead: true }),
   ]);
-  assert.match(html, /#C97474/, 'coral present');
+  assert.match(html, /#EF6B4D/, 'coral present');
   assert.match(html, /FAILED/);
   assert.doesNotMatch(html, /DEAD/, 'the word DEAD is retired in favor of FAILED');
   assert.match(html, /failed to meet a legislative deadline/i, 'explains the failure');
