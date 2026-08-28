@@ -6,6 +6,8 @@ import {
   daysUntilHearing,
   hearingToday,
   testimonyClosing,
+  parseTimeLabel,
+  hoursUntilHearing,
 } from '../services/notifications/hearing-schedule.js';
 
 const SCHED = (d) => ({
@@ -70,4 +72,26 @@ test('testimonyClosing flags a hearing today or tomorrow (24h window), not later
   assert.equal(testimonyClosing([SCHED('03-06-26')], '2026-03-06').daysUntil, 0); // today
   assert.equal(testimonyClosing([SCHED('03-07-26')], '2026-03-06').daysUntil, 1); // tomorrow
   assert.equal(testimonyClosing([SCHED('03-09-26')], '2026-03-06'), null);        // 3 days out
+});
+
+// --- hours-until-hearing (testimony deadlines in hours) ----------------------
+test('parseTimeLabel handles AM/PM and midnight/noon boundaries', () => {
+  assert.deepEqual(parseTimeLabel('2:00PM'), { hour24: 14, minute: 0 });
+  assert.deepEqual(parseTimeLabel('10:30AM'), { hour24: 10, minute: 30 });
+  assert.deepEqual(parseTimeLabel('12:00PM'), { hour24: 12, minute: 0 }); // noon
+  assert.deepEqual(parseTimeLabel('12:15AM'), { hour24: 0, minute: 15 }); // after midnight
+  assert.equal(parseTimeLabel('no time'), null);
+  assert.equal(parseTimeLabel(null), null);
+});
+
+test('hoursUntilHearing counts HST hours to the hearing time', () => {
+  // hearing 2026-09-15 2:00PM HST == 2026-09-16 00:00 UTC
+  const now = Date.UTC(2026, 8, 15, 4, 0, 0); // 2026-09-14 6:00PM HST
+  assert.equal(hoursUntilHearing('2026-09-15', '2:00PM', now), 20);
+  // exactly at the hearing -> 0
+  assert.equal(hoursUntilHearing('2026-09-15', '2:00PM', Date.UTC(2026, 8, 16, 0, 0, 0)), 0);
+  // past the hearing -> clamped to 0, never negative
+  assert.equal(hoursUntilHearing('2026-09-15', '2:00PM', Date.UTC(2026, 8, 16, 3, 0, 0)), 0);
+  // no parseable time -> null (caller falls back to days)
+  assert.equal(hoursUntilHearing('2026-09-15', null, now), null);
 });

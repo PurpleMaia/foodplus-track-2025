@@ -34,7 +34,7 @@ try {
   console.error('[NOTIFY] logo asset not found; emails will send without an embedded logo:', err.message);
 }
 
-//  brand palette (from app globals.css, HSL → hex).
+//  brand palette (from app globals.css, HSL → hex). Light-mode values.
 const COLOR = {
   cream: '#FAF8F5',
   white: '#FFFFFF',
@@ -47,6 +47,22 @@ const COLOR = {
   olive: '#A8B660',
   gold: '#B8860B',      // "hearing today" highlight (warm, distinct from teal/coral)
   goldSoft: '#FBF3DC',  // its soft background
+};
+
+// Dark-mode palette. Applied via a <style> @media (prefers-color-scheme: dark)
+// block in the email shell (see renderEmailShell). Supported by clients that honor
+// prefers-color-scheme (Apple Mail, iOS Mail, most modern clients); clients that
+// force their own inversion will do their own thing regardless, but the light
+// inline styles remain a correct fallback everywhere.
+const DARK = {
+  page: '#12181B',      // page background (deep blue-charcoal, keyed off the teal)
+  card: '#1B2429',      // content card / bill cards
+  cardBorder: '#2C3A40',
+  text: '#E6EDEF',      // primary text on dark
+  muted: '#9BA9AE',     // secondary text
+  teal: '#3E8CA0',      // lightened brand teal so it reads on dark
+  tealSoft: '#24343A',  // old-status pill bg on dark
+  coral: '#E5735C',     // lightened coral for readable urgency on dark
 };
 
 /**
@@ -154,14 +170,14 @@ export function displayLabel(statusId) {
  */
 function statusPill(label, variant) {
   const schemes = {
-    old: { bg: COLOR.tealSoft, fg: COLOR.text },
-    new: { bg: COLOR.teal, fg: COLOR.white },
-    dead: { bg: COLOR.coral, fg: COLOR.white },
-    alive: { bg: COLOR.olive, fg: COLOR.text },
+    old: { bg: COLOR.tealSoft, fg: COLOR.text, cls: 'dm-pill-old' },
+    new: { bg: COLOR.teal, fg: COLOR.white, cls: 'dm-pill-new' },
+    dead: { bg: COLOR.coral, fg: COLOR.white, cls: 'dm-pill-dead' },
+    alive: { bg: COLOR.olive, fg: COLOR.text, cls: '' },
   };
-  const { bg, fg } = schemes[variant] ?? schemes.old;
+  const { bg, fg, cls } = schemes[variant] ?? schemes.old;
   return (
-    `<span style="display:inline-block;padding:4px 12px;border-radius:999px;` +
+    `<span class="${cls}" style="display:inline-block;padding:4px 12px;border-radius:999px;` +
     `background-color:${bg};color:${fg};font-size:13px;font-weight:600;` +
     `line-height:1.4;white-space:nowrap;">${escapeHtml(label)}</span>`
   );
@@ -276,7 +292,7 @@ function effectiveGuidance(change) {
 function meaningLine(change) {
   const meaning = effectiveGuidance(change).meaning;
   if (!meaning) return '';
-  return `<div style="margin-top:10px;font-size:14px;color:${COLOR.text};line-height:1.5;">${escapeHtml(meaning)}</div>`;
+  return `<div class="dm-text" style="margin-top:10px;font-size:14px;color:${COLOR.text};line-height:1.5;">${escapeHtml(meaning)}</div>`;
 }
 
 /**
@@ -287,7 +303,7 @@ function meaningLine(change) {
  */
 function rawStatusLine(rawStatus) {
   if (!rawStatus) return '';
-  return `<div style="margin-top:6px;font-size:13px;color:${COLOR.muted};line-height:1.4;">${escapeHtml(rawStatus)}</div>`;
+  return `<div class="dm-muted" style="margin-top:6px;font-size:13px;color:${COLOR.muted};line-height:1.4;">${escapeHtml(rawStatus)}</div>`;
 }
 
 /**
@@ -297,16 +313,16 @@ function rawStatusLine(rawStatus) {
  */
 function billCard(change, accent = COLOR.teal) {
   const title = change.bill_title
-    ? `<div style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(change.bill_title)}</div>`
+    ? `<div class="dm-muted" style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(change.bill_title)}</div>`
     : '';
   // Meaning + action come from the same effective-guidance resolver so they never
   // disagree (e.g. a hearing today forces "Submit testimony"). A newly-failed bill
   // resolves to a null action, so no CTA renders.
   const action = actionLink(effectiveGuidance(change).action, change.bill_id, accent);
   return (
-    `<div style="border:1px solid ${COLOR.border};border-radius:8px;` +
+    `<div class="dm-card" style="border:1px solid ${COLOR.border};border-radius:8px;` +
     `padding:16px 18px;margin-bottom:12px;background-color:${COLOR.white};">` +
-    `<div style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(change.bill_number)}</div>` +
+    `<div class="dm-text" style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(change.bill_number)}</div>` +
     title +
     statusRow(change) +
     rawStatusLine(change.raw_status) +
@@ -329,16 +345,34 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
 <title>Hawaiʻi Bill Tracker</title>
+<style>
+  /* Light styles are inline (below) as the universal fallback. These class-based
+     overrides apply in clients that honor prefers-color-scheme (Apple Mail, iOS
+     Mail, most modern clients). !important is required to win over inline styles. */
+  @media (prefers-color-scheme: dark) {
+    .dm-page   { background-color: ${DARK.page} !important; }
+    .dm-card   { background-color: ${DARK.card} !important; border-color: ${DARK.cardBorder} !important; }
+    .dm-text   { color: ${DARK.text} !important; }
+    .dm-muted  { color: ${DARK.muted} !important; }
+    .dm-accent { background-color: ${DARK.teal} !important; }
+    .dm-pill-old { background-color: ${DARK.tealSoft} !important; color: ${DARK.text} !important; }
+    .dm-pill-new { background-color: ${DARK.teal} !important; color: #FFFFFF !important; }
+    .dm-coral  { color: ${DARK.coral} !important; }
+    .dm-pill-dead { background-color: ${DARK.coral} !important; }
+  }
+</style>
 </head>
-<body style="margin:0;padding:0;background-color:${COLOR.cream};font-family:Arial,Helvetica,sans-serif;color:${COLOR.text};">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:${COLOR.cream};padding:24px 12px;">
+<body class="dm-page" style="margin:0;padding:0;background-color:${COLOR.cream};font-family:Arial,Helvetica,sans-serif;color:${COLOR.text};">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="dm-page" style="background-color:${COLOR.cream};padding:24px 12px;">
     <tr>
       <td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;">
           <!-- Header: logo + wordmark -->
           <tr>
-            <td style="background-color:${accent};border-radius:12px 12px 0 0;padding:24px 28px;">
+            <td class="dm-accent" style="background-color:${accent};border-radius:12px 12px 0 0;padding:24px 28px;">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
                   <td style="vertical-align:middle;padding-right:14px;">
@@ -355,15 +389,15 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
           </tr>
           <!-- Content card -->
           <tr>
-            <td style="background-color:${COLOR.white};border:1px solid ${COLOR.border};border-top:none;border-radius:0 0 12px 12px;padding:24px 24px 28px;">
-              <p style="margin:0 0 18px;font-size:15px;color:${COLOR.text};">
+            <td class="dm-card" style="background-color:${COLOR.white};border:1px solid ${COLOR.border};border-top:none;border-radius:0 0 12px 12px;padding:24px 24px 28px;">
+              <p class="dm-text" style="margin:0 0 18px;font-size:15px;color:${COLOR.text};">
                 ${escapeHtml(intro)}
               </p>
               ${cardsHtml}
               <!-- CTA -->
               <table role="presentation" cellpadding="0" cellspacing="0" style="margin:22px 0 4px;">
                 <tr>
-                  <td style="border-radius:8px;background-color:${accent};">
+                  <td class="dm-accent" style="border-radius:8px;background-color:${accent};">
                     <a href="${escapeHtml(APP_URL)}" target="_blank"
                        style="display:inline-block;padding:12px 24px;color:${COLOR.white};font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">
                       ${escapeHtml(ctaLabel)}
@@ -376,10 +410,10 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
           <!-- Footer -->
           <tr>
             <td style="padding:18px 24px;">
-              <p style="margin:0;font-size:12px;color:${COLOR.muted};line-height:1.5;">
+              <p class="dm-muted" style="margin:0;font-size:12px;color:${COLOR.muted};line-height:1.5;">
                 You are receiving this because you follow these bills in the Hawaiʻi Bill Tracker.
               </p>
-              <p style="margin:10px 0 0;font-size:12px;color:${COLOR.muted};line-height:1.5;">
+              <p class="dm-muted" style="margin:10px 0 0;font-size:12px;color:${COLOR.muted};line-height:1.5;">
                 Made by Purple Maiʻa Foundation - ʻĀina Foundry, and Hawaiʻi Food+ Policy.
               </p>
             </td>
@@ -462,7 +496,7 @@ function deadlineAction(statusId) {
  */
 function deadlineCard(item) {
   const title = item.bill_title
-    ? `<div style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(item.bill_title)}</div>`
+    ? `<div class="dm-muted" style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(item.bill_title)}</div>`
     : '';
   const statusPart = item.current_status
     ? `<div style="margin-top:8px;line-height:2;">${statusPill(displayLabel(item.current_status), 'old')}</div>`
@@ -477,12 +511,12 @@ function deadlineCard(item) {
   const action = actionLink(deadlineAction(item.current_status), item.bill_id, COLOR.coral);
   const dayWord = item.days_left === 1 ? 'day' : 'days';
   return (
-    `<div style="border:1px solid ${COLOR.border};border-radius:8px;` +
+    `<div class="dm-card" style="border:1px solid ${COLOR.border};border-radius:8px;` +
     `padding:16px 18px;margin-bottom:12px;background-color:${COLOR.white};">` +
-    `<div style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(item.bill_number)}</div>` +
+    `<div class="dm-text" style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(item.bill_number)}</div>` +
     title +
     statusPart +
-    `<div style="margin-top:8px;font-size:14px;font-weight:600;color:${COLOR.coral};">` +
+    `<div class="dm-coral" style="margin-top:8px;font-size:14px;font-weight:600;color:${COLOR.coral};">` +
     `Deadline: ${escapeHtml(item.deadline_name)} on ${escapeHtml(item.deadline_date)} — ${item.days_left} ${dayWord} left` +
     `</div>` +
     meaning +
@@ -560,13 +594,30 @@ export function mergeDigestItems(changes = [], warnings = []) {
   return [...byBill.values()].sort((a, b) => digestRank(a) - digestRank(b));
 }
 
+/**
+ * Human phrasing of how much time is left for a warning. Testimony warnings count
+ * down in HOURS to the hearing time when we have it ("in ~20 hours"); otherwise
+ * (legislative deadlines, or a testimony window with no parseable time) we use the
+ * day-granularity "N days left".
+ * @param {{ days_left: number, hours_left?: number|null, testimony?: boolean }} warning
+ * @returns {string}
+ */
+export function deadlineTiming(warning) {
+  if (warning.testimony && warning.hours_left != null) {
+    const h = warning.hours_left;
+    if (h <= 0) return 'due now';
+    return `in ~${h} hour${h === 1 ? '' : 's'}`;
+  }
+  const d = warning.days_left;
+  return `${d} day${d === 1 ? '' : 's'} left`;
+}
+
 /** The deadline line for a merged item's warning, or '' when it has none. */
 function deadlineLine(warning) {
   if (!warning) return '';
-  const dayWord = warning.days_left === 1 ? 'day' : 'days';
   return (
-    `<div style="margin-top:8px;font-size:14px;font-weight:600;color:${COLOR.coral};">` +
-    `Deadline: ${escapeHtml(warning.deadline_name)} on ${escapeHtml(warning.deadline_date)} — ${warning.days_left} ${dayWord} left` +
+    `<div class="dm-coral" style="margin-top:8px;font-size:14px;font-weight:600;color:${COLOR.coral};">` +
+    `Deadline: ${escapeHtml(warning.deadline_name)} on ${escapeHtml(warning.deadline_date)} — ${escapeHtml(deadlineTiming(warning))}` +
     `</div>`
   );
 }
@@ -582,7 +633,7 @@ function deadlineLine(warning) {
  */
 function unifiedCard(item, accent) {
   const title = item.bill_title
-    ? `<div style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(item.bill_title)}</div>`
+    ? `<div class="dm-muted" style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(item.bill_title)}</div>`
     : '';
 
   // Status pills + raw line + meaning only when the bill changed this run.
@@ -598,9 +649,9 @@ function unifiedCard(item, accent) {
     : actionLink(effectiveGuidance({ ...item.change, hearing_today: item.hearing_today }).action, item.bill_id, accent);
 
   return (
-    `<div style="border:1px solid ${COLOR.border};border-radius:8px;` +
+    `<div class="dm-card" style="border:1px solid ${COLOR.border};border-radius:8px;` +
     `padding:16px 18px;margin-bottom:12px;background-color:${COLOR.white};">` +
-    `<div style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(item.bill_number)}</div>` +
+    `<div class="dm-text" style="color:${COLOR.text};font-size:16px;font-weight:700;">${escapeHtml(item.bill_number)}</div>` +
     title +
     changeParts +
     hearingTodayBanner(item.hearing_today) +
@@ -655,8 +706,7 @@ export function buildDailyDigestBody(items) {
       parts.push(`${i.bill_number}${i.bill_title ? ` (${i.bill_title})` : ''}`);
     }
     if (i.warning) {
-      const dayWord = i.warning.days_left === 1 ? 'day' : 'days';
-      parts.push(`deadline: ${i.warning.deadline_name} on ${i.warning.deadline_date} — ${i.warning.days_left} ${dayWord} left`);
+      parts.push(`deadline: ${i.warning.deadline_name} on ${i.warning.deadline_date} — ${deadlineTiming(i.warning)}`);
     }
     return `- ${parts.join(' · ')}`;
   });

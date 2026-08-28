@@ -3,7 +3,7 @@ import { db } from '../../../db/kysely/client.js';
 import { getNextDeadline } from '../dead-bill.js';
 import sessionDeadlines from '../../../session-deadlines-2026.json' with { type: 'json' };
 import { sendDeadlineWarningEmail } from './bill-updates-digest.js';
-import { testimonyClosing } from './hearing-schedule.js';
+import { testimonyClosing, hoursUntilHearing } from './hearing-schedule.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const HEADS_UP_DAYS = 7; // first "heads up" tier
@@ -148,7 +148,7 @@ async function defaultFetchBillsWithStatus() {
  * @param {{ fetchBills?: () => Promise<Array<BillRow & { statusUpdates: Array<{ date: string, statustext: string }> }>> }} [deps]
  * @returns {Promise<Array<{ bill: BillRow, nextName: string, nextDate: string, daysLeft: number, tier: '3', testimony: true }>>}
  */
-export async function checkTestimonyDeadlines(today, { fetchBills = defaultFetchBillsWithStatus } = {}) {
+export async function checkTestimonyDeadlines(today, { fetchBills = defaultFetchBillsWithStatus, nowMs = Date.now() } = {}) {
   const bills = await fetchBills();
   const toWarn = [];
 
@@ -156,11 +156,17 @@ export async function checkTestimonyDeadlines(today, { fetchBills = defaultFetch
     const closing = testimonyClosing(bill.statusUpdates, today);
     if (!closing) continue;
 
+    // Testimony warnings are expressed in HOURS until the hearing time when we have
+    // a parseable time; hoursLeft is null when only the date is known (the renderer
+    // then falls back to a day-granularity phrasing).
+    const hoursLeft = hoursUntilHearing(closing.date, closing.time, nowMs);
+
     toWarn.push({
       bill,
       nextName: closing.time ? `Testimony deadline (hearing ${closing.time})` : 'Testimony deadline',
       nextDate: closing.date,
       daysLeft: closing.daysUntil,
+      hoursLeft,
       tier: '3', // testimony closing is always urgent
       testimony: true,
     });

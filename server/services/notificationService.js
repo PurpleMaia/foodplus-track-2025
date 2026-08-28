@@ -134,6 +134,8 @@ function warningToItem(w) {
     deadline_name: w.nextName,
     deadline_date: w.nextDate,
     days_left: w.daysLeft,
+    hours_left: w.hoursLeft ?? null, // testimony warnings: hours until the hearing time
+    testimony: Boolean(w.testimony),
     tier: w.tier,
   };
 }

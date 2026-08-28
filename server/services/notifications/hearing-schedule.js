@@ -87,6 +87,42 @@ export function daysUntilHearing(date, today) {
   return Math.round((new Date(`${date}T00:00:00Z`) - new Date(`${today}T00:00:00Z`)) / DAY_MS);
 }
 
+// Hawaiʻi has no DST; HST is a fixed UTC-10.
+const HST_OFFSET = '-10:00';
+
+/**
+ * Parse a hearing time label ("2:00PM", "1:02PM", "10:30AM") into { hour24, minute },
+ * or null if it can't be parsed.
+ * @param {string|null|undefined} time
+ * @returns {{ hour24: number, minute: number } | null}
+ */
+export function parseTimeLabel(time) {
+  const m = /^(\d{1,2}):(\d{2})(AM|PM)$/i.exec((time || '').trim());
+  if (!m) return null;
+  let hour = parseInt(m[1], 10) % 12;
+  if (/PM/i.test(m[3])) hour += 12;
+  return { hour24: hour, minute: parseInt(m[2], 10) };
+}
+
+/**
+ * Whole hours from `nowMs` until a hearing at `date` (YYYY-MM-DD) + `time` label,
+ * interpreting the hearing time as HST. Rounded, never negative. Returns null when
+ * there is no parseable time (caller should fall back to a day-granularity message).
+ * @param {string} date - YYYY-MM-DD (HST calendar date)
+ * @param {string|null} time - e.g. "2:00PM"
+ * @param {number} nowMs - current time in epoch ms (pass Date.now())
+ * @returns {number|null}
+ */
+export function hoursUntilHearing(date, time, nowMs) {
+  const t = parseTimeLabel(time);
+  if (!t) return null;
+  const hh = String(t.hour24).padStart(2, '0');
+  const mm = String(t.minute).padStart(2, '0');
+  const hearingMs = new Date(`${date}T${hh}:${mm}:00${HST_OFFSET}`).getTime();
+  if (Number.isNaN(hearingMs)) return null;
+  return Math.max(0, Math.round((hearingMs - nowMs) / (60 * 60 * 1000)));
+}
+
 /**
  * Does this bill have a hearing scheduled for `today`?
  * @param {Array<{ date?: string, statustext: string }>} statusUpdates
