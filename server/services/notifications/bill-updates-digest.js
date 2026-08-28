@@ -418,6 +418,26 @@ export function buildDeadlineWarningBody(items, { urgent = false } = {}) {
   ].join('\n');
 }
 
+/** True when a status is a "scheduled for a hearing" stage (any reading, pre/post
+ * crossover, or conference). These are the stages where a testimony window is open. */
+function isScheduledStatus(statusId) {
+  const id = statusId || '';
+  return /^(crossover)?[Ss]cheduled\d$/.test(id) || id === 'conferenceScheduled';
+}
+
+/**
+ * The single CTA for a deadline-warning card, by an explicit binary rule:
+ *   scheduled for a hearing → Submit testimony
+ *   anything else           → Contact your legislator
+ * @param {string|null} statusId - the bill's current bill_status
+ * @returns {{ kind: 'testimony'|'contact', label: string }}
+ */
+function deadlineAction(statusId) {
+  return isScheduledStatus(statusId)
+    ? { kind: 'testimony', label: 'Submit testimony' }
+    : { kind: 'contact', label: 'Contact your legislator' };
+}
+
 /**
  * One coral deadline-warning card: bill number, title, current status, deadline line.
  * @param {{ bill_id?: string, bill_number: string, bill_title: string|null, current_status: string|null, deadline_name: string, deadline_date: string, days_left: number }} item
@@ -434,7 +454,10 @@ function deadlineCard(item) {
   const meaning = guidance.meaning
     ? `<div style="margin-top:10px;font-size:14px;color:${COLOR.text};line-height:1.5;">${escapeHtml(guidance.meaning)}</div>`
     : '';
-  const action = actionLink(guidance.action, item.bill_id, COLOR.coral);
+  // Deadline-warning CTA is binary and independent of the general stage guidance:
+  // a bill scheduled for a hearing → submit testimony; otherwise → contact your
+  // legislator to push it forward before the deadline.
+  const action = actionLink(deadlineAction(item.current_status), item.bill_id, COLOR.coral);
   const dayWord = item.days_left === 1 ? 'day' : 'days';
   return (
     `<div style="border:1px solid ${COLOR.border};border-left:4px solid ${COLOR.coral};border-radius:8px;` +

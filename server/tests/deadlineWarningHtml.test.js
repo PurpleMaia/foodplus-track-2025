@@ -79,6 +79,24 @@ test('deadline card omits the action link when bill_id is missing', () => {
   assert.doesNotMatch(html, /\/bills\/[^/]+\/testimony/, 'no link without an id');
 });
 
+test('deadline CTA: any scheduled status -> Submit testimony', () => {
+  for (const status of ['scheduled1', 'scheduled3', 'crossoverScheduled1', 'conferenceScheduled']) {
+    const html = buildDeadlineWarningHtml([item({ bill_id: 'd1', current_status: status })]);
+    assert.match(html, /Submit testimony/, status);
+    assert.match(html, /\/bills\/d1\/testimony/, status);
+    assert.doesNotMatch(html, /Contact your legislator/, status);
+  }
+});
+
+test('deadline CTA: any non-scheduled status -> Contact your legislator', () => {
+  for (const status of ['waiting2', 'crossoverWaiting1', 'introduced', 'passedCommittees', 'deferred1', null]) {
+    const html = buildDeadlineWarningHtml([item({ bill_id: 'd1', current_status: status })]);
+    assert.match(html, /Contact your legislator/, String(status));
+    assert.match(html, /\/bills\/d1\/contact/, String(status));
+    assert.doesNotMatch(html, /Submit testimony/, String(status));
+  }
+});
+
 test('plain-text body mirrors the warning', () => {
   const text = buildDeadlineWarningBody([item()], { urgent: false });
   assert.match(text, /Bills you follow are approaching a deadline/);
