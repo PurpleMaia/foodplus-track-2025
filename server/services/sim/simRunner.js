@@ -30,17 +30,27 @@ export function simDayFor(dateStr) {
   return idx === -1 ? 0 : idx + 1;
 }
 
-/** Latest testimony stance for a bill id, or null if none submitted. */
+/**
+ * Latest testimony stance for a bill id, or null if none submitted.
+ * The `testimonies` table belongs to the front-facing app and may not exist in
+ * every environment; if it's absent we treat it as "no testimony" (stance null)
+ * rather than failing the bill.
+ */
 async function latestStance(billId) {
-  const row = await db
-    .selectFrom('testimonies')
-    .select(['position', 'submitted_at'])
-    .where('bill_id', '=', billId)
-    .where('submitted_at', 'is not', null)
-    .orderBy('submitted_at', 'desc')
-    .executeTakeFirst();
-  if (!row) return null;
-  return normalizeStance(row.position);
+  try {
+    const row = await db
+      .selectFrom('testimonies')
+      .select(['position', 'submitted_at'])
+      .where('bill_id', '=', billId)
+      .where('submitted_at', 'is not', null)
+      .orderBy('submitted_at', 'desc')
+      .executeTakeFirst();
+    if (!row) return null;
+    return normalizeStance(row.position);
+  } catch (err) {
+    if (/relation .*testimonies.* does not exist/i.test(err.message)) return null;
+    throw err;
+  }
 }
 
 /** Replace a bill's status_updates with the given newest-first log. */

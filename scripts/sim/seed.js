@@ -45,6 +45,7 @@ async function main() {
       current_status_string: '',
       bill_status: null,
       dead: false,
+      archived: false,
       food_related: true,
       year: 2026,
       updated_at: new Date(),
