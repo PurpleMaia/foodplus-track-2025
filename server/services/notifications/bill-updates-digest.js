@@ -49,21 +49,9 @@ const COLOR = {
   goldSoft: '#FBF3DC',  // its soft background
 };
 
-// Dark-mode palette. Applied via a <style> @media (prefers-color-scheme: dark)
-// block in the email shell (see renderEmailShell). Supported by clients that honor
-// prefers-color-scheme (Apple Mail, iOS Mail, most modern clients); clients that
-// force their own inversion will do their own thing regardless, but the light
-// inline styles remain a correct fallback everywhere.
-const DARK = {
-  page: '#12181B',      // page background (deep blue-charcoal, keyed off the teal)
-  card: '#1B2429',      // content card / bill cards
-  cardBorder: '#2C3A40',
-  text: '#E6EDEF',      // primary text on dark
-  muted: '#9BA9AE',     // secondary text
-  teal: '#3E8CA0',      // lightened brand teal so it reads on dark
-  tealSoft: '#24343A',  // old-status pill bg on dark
-  coral: '#E5735C',     // lightened coral for readable urgency on dark
-};
+// Note: dark mode does NOT use a separate dark palette. The email pins its light
+// appearance (cream page, white cards, teal accent) in dark mode via the
+// prefers-color-scheme block in renderEmailShell, so there is no DARK palette.
 
 /**
  * Build the plain-text body of a per-user bill-update digest.
@@ -349,19 +337,22 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
 <meta name="supported-color-schemes" content="light dark">
 <title>Hawaiʻi Bill Tracker</title>
 <style>
-  /* Light styles are inline (below) as the universal fallback. These class-based
-     overrides apply in clients that honor prefers-color-scheme (Apple Mail, iOS
-     Mail, most modern clients). !important is required to win over inline styles. */
+  /* We do NOT switch to a dark palette in dark mode — a dark theme read poorly.
+     Instead we PIN the light appearance (cream page, white cards, dark brand text,
+     teal accent) in clients that honor prefers-color-scheme, so the email looks the
+     same in light and dark. !important is required to win over both inline styles
+     and any client auto-darkening. The title text stays white on the teal header. */
   @media (prefers-color-scheme: dark) {
-    .dm-page   { background-color: ${DARK.page} !important; }
-    .dm-card   { background-color: ${DARK.card} !important; border-color: ${DARK.cardBorder} !important; }
-    .dm-text   { color: ${DARK.text} !important; }
-    .dm-muted  { color: ${DARK.muted} !important; }
-    .dm-accent { background-color: ${DARK.teal} !important; }
-    .dm-pill-old { background-color: ${DARK.tealSoft} !important; color: ${DARK.text} !important; }
-    .dm-pill-new { background-color: ${DARK.teal} !important; color: #FFFFFF !important; }
-    .dm-coral  { color: ${DARK.coral} !important; }
-    .dm-pill-dead { background-color: ${DARK.coral} !important; }
+    .dm-page   { background-color: ${COLOR.cream} !important; }
+    .dm-card   { background-color: ${COLOR.white} !important; border-color: ${COLOR.border} !important; }
+    .dm-text   { color: ${COLOR.text} !important; }
+    .dm-muted  { color: ${COLOR.muted} !important; }
+    .dm-accent { background-color: ${COLOR.teal} !important; }
+    .dm-title  { color: #FFFFFF !important; }
+    .dm-pill-old { background-color: ${COLOR.tealSoft} !important; color: ${COLOR.text} !important; }
+    .dm-pill-new { background-color: ${COLOR.teal} !important; color: #FFFFFF !important; }
+    .dm-coral  { color: ${COLOR.coral} !important; }
+    .dm-pill-dead { background-color: ${COLOR.coral} !important; color: #FFFFFF !important; }
   }
 </style>
 </head>
@@ -380,8 +371,8 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
                          style="display:block;width:48px;height:48px;border:0;" />
                   </td>
                   <td style="vertical-align:middle;">
-                    <div style="color:${COLOR.white};font-size:22px;font-weight:700;letter-spacing:-0.3px;">${escapeHtml(title)}</div>
-                    <div style="color:${COLOR.white};opacity:0.85;font-size:14px;margin-top:4px;">${escapeHtml(subtitle)}</div>
+                    <div class="dm-title" style="color:${COLOR.white};font-size:22px;font-weight:700;letter-spacing:-0.3px;">${escapeHtml(title)}</div>
+                    <div class="dm-title" style="color:${COLOR.white};opacity:0.85;font-size:14px;margin-top:4px;">${escapeHtml(subtitle)}</div>
                   </td>
                 </tr>
               </table>
