@@ -21,10 +21,24 @@ test('renders bill number and title', () => {
   assert.match(html, /Local Food Act/);
 });
 
-test('status change renders human-readable old and new labels', () => {
+test('displayLabel strips committee ordinals for email display', async () => {
+  const { displayLabel } = await import('../services/notifications/bill-updates-digest.js');
+  assert.equal(displayLabel('introduced'), 'INTRODUCED & WAITING');
+  assert.equal(displayLabel('scheduled1'), 'SCHEDULED');
+  assert.equal(displayLabel('waiting2'), 'WAITING');
+  assert.equal(displayLabel('scheduled3'), 'SCHEDULED');
+  assert.equal(displayLabel('crossoverScheduled1'), 'SCHEDULED');
+  assert.equal(displayLabel('deferred2'), 'Deferred after Committee Hearing');
+  // Non-ordinal titles are untouched.
+  assert.equal(displayLabel('passedCommittees'), 'CONFERENCE');
+  assert.equal(displayLabel('transmittedGovernor'), 'TRANSMITTED TO GOVERNOR');
+});
+
+test('status change renders human-readable old and new labels (ordinals simplified)', () => {
   const html = buildBillUpdateHtml([change()]);
-  // statusLabel maps ids → COLUMN_TITLES
-  assert.match(html, /WAITING 2ND/);
+  // displayLabel drops committee ordinals: waiting2 -> "WAITING" (not "WAITING 2ND")
+  assert.match(html, /WAITING</, 'simplified WAITING pill');
+  assert.doesNotMatch(html, /WAITING 2ND/, 'ordinal removed');
   assert.match(html, /CONFERENCE/);
 });
 
@@ -98,9 +112,11 @@ test('renders the kanban stage labels, with the raw Capitol line as subtext', ()
       raw_status: '(H) Bill scheduled to be heard by FIN on 02-25-26 2:00PM in conference room 308.',
     }),
   ]);
-  // clean kanban labels from statusLabel(COLUMN_TITLES) — '&' is HTML-escaped
-  assert.match(html, /INTRODUCED &amp; WAITING 1ST/);
-  assert.match(html, /SCHEDULED 1ST/);
+  // simplified kanban labels (ordinals dropped) — '&' is HTML-escaped
+  assert.match(html, /INTRODUCED &amp; WAITING</);
+  assert.doesNotMatch(html, /WAITING 1ST/);
+  assert.match(html, /SCHEDULED</);
+  assert.doesNotMatch(html, /SCHEDULED 1ST/);
   // raw Capitol text present as detail subtext
   assert.match(html, /scheduled to be heard by FIN on 02-25-26 2:00PM/);
 });

@@ -130,6 +130,23 @@ export function stageGuidance(statusId) {
 }
 
 /**
+ * The stage label to SHOW in emails, simplified to drop committee ordinals so
+ * followers see "SCHEDULED" / "WAITING" rather than "SCHEDULED 1ST" / "WAITING 2ND".
+ * The underlying kanban titles (COLUMN_TITLES) are unchanged — this only affects
+ * the email display. Strips trailing numeric ordinals (1ST/2ND/3RD) and the
+ * word ordinals (First/Second/Third) used in the deferred titles.
+ * @param {string|null|undefined} statusId
+ * @returns {string}
+ */
+export function displayLabel(statusId) {
+  return statusLabel(statusId)
+    .replace(/\s+(?:1ST|2ND|3RD)\b/gi, '')
+    .replace(/\b(?:First|Second|Third)\s+/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Inline-styled status badge. `variant` selects the brand color scheme.
  * @param {string} label
  * @param {'old'|'new'|'dead'|'alive'} variant
@@ -164,12 +181,12 @@ function statusRow(change) {
   });
   const pills = [];
   if (statusChanged) {
-    pills.push(statusPill(statusLabel(change.old_status), 'old'));
+    pills.push(statusPill(displayLabel(change.old_status), 'old'));
     pills.push(
       `<span style="color:${COLOR.muted};font-size:15px;font-weight:700;` +
       `padding:0 4px;vertical-align:middle;">&rarr;</span>`,
     );
-    pills.push(statusPill(statusLabel(change.new_status), 'new'));
+    pills.push(statusPill(displayLabel(change.new_status), 'new'));
   }
   if (deadChanged) {
     pills.push(
@@ -363,7 +380,7 @@ function renderEmailShell({ accent, title, subtitle, intro, cardsHtml, ctaLabel 
                 You are receiving this because you follow these bills in the Hawaiʻi Bill Tracker.
               </p>
               <p style="margin:10px 0 0;font-size:12px;color:${COLOR.muted};line-height:1.5;">
-                Made by Purple Maiʻa Foundation, ʻĀina Foundry, and Hawaiʻi Food+ Policy.
+                Made by Purple Maiʻa Foundation - ʻĀina Foundry, and Hawaiʻi Food+ Policy.
               </p>
             </td>
           </tr>
@@ -448,7 +465,7 @@ function deadlineCard(item) {
     ? `<div style="color:${COLOR.muted};font-size:14px;margin-top:2px;">${escapeHtml(item.bill_title)}</div>`
     : '';
   const statusPart = item.current_status
-    ? `<div style="margin-top:8px;line-height:2;">${statusPill(statusLabel(item.current_status), 'old')}</div>`
+    ? `<div style="margin-top:8px;line-height:2;">${statusPill(displayLabel(item.current_status), 'old')}</div>`
     : '';
   const guidance = stageGuidance(item.current_status);
   const meaning = guidance.meaning
@@ -572,7 +589,7 @@ function unifiedCard(item, accent) {
   const changeParts = item.change
     ? statusRow(item.change) + rawStatusLine(item.change.raw_status) + meaningLine({ ...item.change, hearing_today: item.hearing_today })
     : (item.warning?.current_status
-        ? `<div style="margin-top:8px;line-height:2;">${statusPill(statusLabel(item.warning.current_status), 'old')}</div>`
+        ? `<div style="margin-top:8px;line-height:2;">${statusPill(displayLabel(item.warning.current_status), 'old')}</div>`
         : '');
 
   // One CTA. At-risk bills use the deadline rule; otherwise the change rule.

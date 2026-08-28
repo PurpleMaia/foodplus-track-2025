@@ -62,9 +62,10 @@ test('footer credits the partner organizations', () => {
   assert.match(html, /Hawaiʻi Food\+ Policy/);
 });
 
-test('current status pill rendered when present', () => {
+test('current status pill rendered when present (ordinal simplified)', () => {
   const html = buildDeadlineWarningHtml([item()]);
-  assert.match(html, /WAITING 2ND/); // statusLabel('waiting2')
+  assert.match(html, /WAITING</); // displayLabel('waiting2') -> "WAITING"
+  assert.doesNotMatch(html, /WAITING 2ND/);
 });
 
 test('deadline card explains the stage and links to an action when bill_id is present', () => {
