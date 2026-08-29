@@ -54,7 +54,7 @@ async function main() {
     const values = {
       bill_number: bill.billNumber,
       bill_title: bill.title ?? `SIM WEEK — ${bill.simId} (${bill.scenario}${bill.isAuto ? ', auto' : ''})`,
-      committee_assignment: '',
+      committee_assignment: bill.committee,
       description: bill.description ?? 'sim week',
       current_status_string: '',
       bill_status: null,
