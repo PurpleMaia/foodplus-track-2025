@@ -21,6 +21,7 @@ import { db } from '../../db/kysely/client.js';
 import { ROSTER, SIM_DATES } from '../../server/services/sim/scenarios.js';
 import { sentinelUrl, runSimDay } from '../../server/services/sim/simRunner.js';
 import { resolveSimUser, ensureFollow } from '../../server/services/sim/simUsers.js';
+import { seedSimCommittees } from './seed-committees.js';
 
 const force = process.argv.includes('--force');
 const day0Only = process.argv.includes('--day0');
@@ -40,6 +41,11 @@ async function main() {
 
   const user = await resolveSimUser();
   console.log(`Sim user: ${user.email} (${user.id})${user.created ? ' [created]' : ''}`);
+
+  // Seed the fake sim committees + tagged chair emails (SIM-JHA, SIM-CPN) so a
+  // single seed run stands up everything the sim needs. Idempotent.
+  const committees = await seedSimCommittees();
+  console.log(`Sim committees: ${committees.map((c) => `${c.committee} -> ${c.email}`).join(', ')}`);
 
   let created = 0;
   let refreshed = 0;

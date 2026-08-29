@@ -99,7 +99,13 @@ async function linkChair(committeeId, legislatorId) {
   }).execute();
 }
 
-async function seed() {
+/**
+ * Seed the fake sim committees + chairs. Does NOT close the db connection, so it
+ * can be called inline by other scripts (e.g. scripts/sim/seed.js) as well as run
+ * standalone. Idempotent.
+ * @returns {Promise<Array<{committee: string, chair: string, email: string}>>}
+ */
+export async function seedSimCommittees() {
   const out = [];
   for (const c of SIM_COMMITTEES) {
     const committeeId = await upsertCommittee(c);
@@ -107,6 +113,11 @@ async function seed() {
     await linkChair(committeeId, legislatorId);
     out.push({ committee: simAcronym(c.code), chair: c.chair, email: tagged(c.code) });
   }
+  return out;
+}
+
+async function seed() {
+  const out = await seedSimCommittees();
   console.log('Seeded fake sim committees + chairs:');
   for (const r of out) console.log(`  ${r.committee.padEnd(8)} chair "${r.chair}"  ->  ${r.email}`);
 }
@@ -140,10 +151,13 @@ async function remove() {
   console.log(`Removed ${cIds.length} sim committee(s) and ${lIds.length} sim legislator(s).`);
 }
 
-const mode = process.argv.includes('--remove') ? remove
-  : process.argv.includes('--list') ? list
-  : seed;
+// Run the CLI only when invoked directly (not when imported by seed.js).
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const mode = process.argv.includes('--remove') ? remove
+    : process.argv.includes('--list') ? list
+    : seed;
 
-mode()
-  .then(() => db.destroy())
-  .catch(async (err) => { console.error(err); try { await db.destroy(); } catch { /* ignore */ } process.exit(1); });
+  mode()
+    .then(() => db.destroy())
+    .catch(async (err) => { console.error(err); try { await db.destroy(); } catch { /* ignore */ } process.exit(1); });
+}
