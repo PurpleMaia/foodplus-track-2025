@@ -45,7 +45,7 @@ test('Scenario 1 auto: classifier yields intended stage each day, no actions nee
 });
 
 // ---------------------------------------------------------------------------
-// Scenario 2 auto — full advance to conference
+// Scenario 2 auto — full advance to conference over 5 days
 // ---------------------------------------------------------------------------
 test('Scenario 2 auto: reaches conferenceAssigned by day 5, no actions needed', () => {
   const expected = ['waiting2', 'crossoverWaiting1', 'crossoverScheduled1', 'passedCommittees', 'conferenceAssigned'];
@@ -100,18 +100,22 @@ test('S1 user: no testimony by day 3 -> dead (default oppose)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Scenario 2 user-driven — first checkpoint is testimony on day 1
+// Scenario 2 user-driven — day 1 ALWAYS advances (no gate); the bill survives the
+// seed regardless of testimony so participants have time to act. The first
+// life/death checkpoint is the crossover CONTACT on day 3.
 // ---------------------------------------------------------------------------
-test('S2 user: support day 1 -> waiting2; oppose/none day 1 -> dead', () => {
-  const pass = buildBillLog(user2, 1, { stance: 'support' });
-  assert.equal(pass.dead, false);
-  assert.equal(stageOf(user2.billNumber, pass.updates), 'waiting2');
-
-  for (const stance of ['oppose', null]) {
-    const die = buildBillLog(user2, 1, { stance });
-    assert.equal(die.dead, true, `stance=${stance}`);
-    assert.equal(isExplicitlyDeferred(die.updates), true, `stance=${stance}`);
+test('S2 user: day 1 auto-advances to waiting2 regardless of testimony', () => {
+  for (const stance of ['support', 'oppose', null]) {
+    const { updates, dead } = buildBillLog(user2, 1, { stance });
+    assert.equal(dead, false, `stance=${stance} must survive day 1`);
+    assert.equal(stageOf(user2.billNumber, updates), 'waiting2', `stance=${stance}`);
   }
+});
+
+test('S2 user: no contact by day 3 -> dead (crossover contact checkpoint)', () => {
+  const { updates, dead } = buildBillLog(user2, 3, { contacted: false });
+  assert.equal(dead, true);
+  assert.equal(isExplicitlyDeferred(updates), true);
 });
 
 test('S2 user full happy path: reaches passedCommittees by day 4 with all actions', () => {

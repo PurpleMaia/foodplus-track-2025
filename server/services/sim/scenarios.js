@@ -115,26 +115,33 @@ const scenario1 = {
 /**
  * SCENARIO 2 — first hearing -> crossover -> crossover hearing -> conference.
  * Back-history seeds an introduced+referred bill before day 1.
- * Checkpoints: day 1 (testify -> pass/defer), day 3 (contact -> crossoverScheduled1),
- * day 4 (testify -> pass/defer).
+ *
+ * Day 1 lands the bill at its first hearing and ADVANCES IT NO MATTER WHAT (the
+ * bill is scheduled and passes committee that day regardless of testimony) — so a
+ * freshly-seeded scenario-2 bill starts alive at waiting2 and nobody dies on day
+ * 1 before participants have had a chance to act. The first real user checkpoint
+ * is the crossover CONTACT on day 3; the crossover TESTIFY vote is day 4.
+ *
+ * Checkpoints: day 3 (contact -> crossoverScheduled1), day 4 (testify -> pass/defer).
  */
 const scenario2 = {
   id: 'scenario2',
   history: [
     { chamber: 'H', statustext: 'Introduced and passed First Reading.' },
     { chamber: 'H', statustext: `Referred to ${COMMITTEE_1}, referral sheet 1.` },
-    { chamber: 'H', statustext: `The committee(s) on ${COMMITTEE_1} has scheduled a public hearing on 09-14-26 2:00PM.` },
   ],
   steps: [
     {
       day: 1,
-      label: 'Hearing',
+      label: 'Hearing (auto-advances)',
       targetStage: 'waiting2',
-      requiredAction: 'testify',
+      // No requiredAction: day 1 always moves forward. The bill is scheduled for a
+      // hearing AND passes committee the same day, so scenario-2 bills survive the
+      // seed regardless of testimony — the life/death gates come later.
       advance: [
+        { chamber: 'H', statustext: `The committee(s) on ${COMMITTEE_1} has scheduled a public hearing on 09-14-26 2:00PM.` },
         { chamber: 'H', statustext: `The committee(s) on ${COMMITTEE_1} recommend(s) that the measure be PASSED, unamended.` },
       ],
-      deathLine: deferOrigin,
     },
     {
       day: 2,

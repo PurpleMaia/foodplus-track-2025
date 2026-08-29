@@ -16,6 +16,7 @@ import { db } from '../../db/kysely/client.js';
 import { ROSTER } from '../../server/services/sim/scenarios.js';
 import { sentinelUrl } from '../../server/services/sim/simRunner.js';
 import { FLAG_FILE } from '../../server/services/sim/flagStore.js';
+import { TESTIFIER_PREFIX } from '../../server/services/sim/simUsers.js';
 
 async function main() {
   const urls = ROSTER.map((b) => sentinelUrl(b.simId));
@@ -34,9 +35,19 @@ async function main() {
     await db.deleteFrom('bills').where('id', 'in', billIds).execute();
   }
 
+  // Remove throwaway testifier users created to simulate testimony crowds. Their
+  // testimonies were already deleted above (by bill_id); any leftover user_bills
+  // for them are cleared here before the user rows go.
+  const testifiers = await db.selectFrom('user').select('id').where('email', 'like', `%+${TESTIFIER_PREFIX}-%`).execute();
+  const testifierIds = testifiers.map((u) => u.id);
+  if (testifierIds.length > 0) {
+    await db.deleteFrom('user_bills').where('user_id', 'in', testifierIds).execute();
+    await db.deleteFrom('user').where('id', 'in', testifierIds).execute();
+  }
+
   await rm(FLAG_FILE, { force: true });
 
-  console.log(`Reset complete: removed ${billIds.length} sim bills and their status/testimony/follow rows; cleared flag file.`);
+  console.log(`Reset complete: removed ${billIds.length} sim bills and their status/testimony/follow rows, ${testifierIds.length} testifier users; cleared flag file.`);
   await db.destroy();
 }
 

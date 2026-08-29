@@ -31,24 +31,40 @@ export function simDayFor(dateStr) {
 }
 
 /**
- * Latest testimony stance for a bill id, or null if none submitted.
+ * Aggregate testimony stance for a bill id across ALL submitted testimonies, or
+ * null if none submitted. Every testimony row is one person's position; we tally
+ * support vs oppose and return the MAJORITY, not just the latest single vote — a
+ * bill moves forward on the collective show of support, so many opposing voices
+ * can sink it even if the most recent testimony happened to be supportive.
+ *
+ * Support wins only when support strictly outnumbers oppose. A tie (or no clear
+ * support) resolves to oppose — the same safe default the per-vote path used:
+ * a bill advances only on a clear show of support (spec §7b).
+ *
  * The `testimonies` table belongs to the front-facing app and may not exist in
- * every environment; if it's absent we treat it as "no testimony" (stance null)
- * rather than failing the bill.
+ * every environment; if it's absent we treat it as "no testimony" (null) rather
+ * than failing the bill.
+ *
+ * @returns {Promise<{stance: ('support'|'oppose'|null), support: number, oppose: number}>}
  */
-async function latestStance(billId) {
+async function aggregateStance(billId) {
   try {
-    const row = await db
+    const rows = await db
       .selectFrom('testimonies')
-      .select(['position', 'submitted_at'])
+      .select(['position'])
       .where('bill_id', '=', billId)
       .where('submitted_at', 'is not', null)
-      .orderBy('submitted_at', 'desc')
-      .executeTakeFirst();
-    if (!row) return null;
-    return normalizeStance(row.position);
+      .execute();
+    if (rows.length === 0) return { stance: null, support: 0, oppose: 0 };
+    let support = 0;
+    let oppose = 0;
+    for (const r of rows) {
+      if (normalizeStance(r.position) === 'support') support++;
+      else oppose++;
+    }
+    return { stance: support > oppose ? 'support' : 'oppose', support, oppose };
   } catch (err) {
-    if (/relation .*testimonies.* does not exist/i.test(err.message)) return null;
+    if (/relation .*testimonies.* does not exist/i.test(err.message)) return { stance: null, support: 0, oppose: 0 };
     throw err;
   }
 }
@@ -93,7 +109,7 @@ export async function runSimDay(dateStr) {
       }
 
       const contacted = flags[bill.simId]?.action === 'contact';
-      const stance = await latestStance(row.id);
+      const { stance, support, oppose } = await aggregateStance(row.id);
 
       const { updates } = buildBillLog(bill, simDay, { contacted, stance });
       await replaceStatusUpdates(row.id, updates);
@@ -137,6 +153,7 @@ export async function runSimDay(dateStr) {
         stage: newStatus,
         dead: newDead,
         changed: Boolean(change),
+        testimony: { stance, support, oppose },
       });
     } catch (err) {
       // Isolate failures per bill, like the real scrape.

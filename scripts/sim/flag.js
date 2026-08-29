@@ -6,10 +6,16 @@
  *   node scripts/sim/flag.js --list
  *   node scripts/sim/flag.js --clear SIM-03
  *
- * TESTIMONY (test convenience — inserts a real `testimonies` row against the
- * sim bill so the pass/defer path can be exercised without the front-facing app):
+ * TESTIMONY (test convenience — inserts real `testimonies` rows against the sim
+ * bill so the pass/defer path can be exercised without the front-facing app).
+ * The runner tallies ALL testimonies for a bill (majority support vs oppose), so
+ * you can simulate a crowd, not just one vote:
  *   node scripts/sim/flag.js --bill SIM-04 --action testify --stance support
  *   node scripts/sim/flag.js --bill SIM-05 --action testify --stance oppose
+ *   node scripts/sim/flag.js --bill SIM-06 --action testify --support 7 --oppose 3
+ *
+ * --stance X is shorthand for one row of X. --support N / --oppose M insert N
+ * supporting and M opposing rows (each a distinct author_name) in one call.
  *
  * See docs/superpowers/specs/2026-08-27-sim-week-design.md §7.
  */
@@ -17,7 +23,7 @@
 import { db } from '../../db/kysely/client.js';
 import { ROSTER } from '../../server/services/sim/scenarios.js';
 import { sentinelUrl } from '../../server/services/sim/simRunner.js';
-import { resolveSimUser } from '../../server/services/sim/simUsers.js';
+import { resolveSimUser, resolveSimTestifiers } from '../../server/services/sim/simUsers.js';
 import { readFlags, setContactFlag, clearFlag } from '../../server/services/sim/flagStore.js';
 
 function arg(name) {
@@ -56,21 +62,47 @@ async function main() {
   }
 
   if (action === 'testify') {
+    // Accept either --stance X (one row) or --support N / --oppose M (a crowd).
     const stance = (arg('--stance') || '').toLowerCase();
-    if (stance !== 'support' && stance !== 'oppose') {
-      throw new Error('--action testify requires --stance support|oppose');
+    let nSupport = Number(arg('--support') || 0);
+    let nOppose = Number(arg('--oppose') || 0);
+    if (stance === 'support') nSupport += 1;
+    else if (stance === 'oppose') nOppose += 1;
+    else if (stance) throw new Error('--stance must be support|oppose');
+
+    if (nSupport === 0 && nOppose === 0) {
+      throw new Error('--action testify requires --stance support|oppose (or --support N / --oppose M)');
     }
+    if (!Number.isInteger(nSupport) || !Number.isInteger(nOppose) || nSupport < 0 || nOppose < 0) {
+      throw new Error('--support / --oppose must be non-negative integers');
+    }
+
     const url = sentinelUrl(simId);
     const bill = await db.selectFrom('bills').select('id').where('bill_url', '=', url).executeTakeFirst();
     if (!bill) throw new Error(`Sim bill ${simId} not seeded — run scripts/sim/seed.js first.`);
-    const user = await resolveSimUser();
-    await db.insertInto('testimonies').values({
-      bill_id: bill.id,
-      user_id: user.id,
-      position: stance,
-      submitted_at: new Date(),
-    }).execute();
-    console.log(`Inserted ${stance} testimony for ${simId}. It will ${stance === 'support' ? 'PASS' : 'be DEFERRED'} on the next run.`);
+
+    // testimonies has a unique (user_id, bill_id) constraint, so each testimony
+    // needs a DISTINCT user. Resolve as many throwaway testifier users as the
+    // crowd needs, then assign them across the support/oppose split.
+    const testifiers = await resolveSimTestifiers(nSupport + nOppose);
+
+    // Replace this bill's testimonies so counts are exact (not additive across
+    // repeated flag runs). reset.js also clears these by bill_id.
+    await db.deleteFrom('testimonies').where('bill_id', '=', bill.id).execute();
+
+    const rows = [];
+    let t = 0;
+    for (let i = 0; i < nSupport; i++, t++) {
+      rows.push({ bill_id: bill.id, user_id: testifiers[t].id, position: 'support', author_name: `Sim Supporter ${i + 1}`, submitted_at: new Date() });
+    }
+    for (let i = 0; i < nOppose; i++, t++) {
+      rows.push({ bill_id: bill.id, user_id: testifiers[t].id, position: 'oppose', author_name: `Sim Opponent ${i + 1}`, submitted_at: new Date() });
+    }
+    await db.insertInto('testimonies').values(rows).execute();
+
+    const majority = nSupport > nOppose ? 'support' : 'oppose';
+    const outcome = nSupport > nOppose ? 'PASS' : 'be DEFERRED';
+    console.log(`Recorded ${nSupport} support + ${nOppose} oppose testimony for ${simId} (majority ${majority}). It will ${outcome} at its testimony checkpoint on the next run.`);
     return;
   }
 
